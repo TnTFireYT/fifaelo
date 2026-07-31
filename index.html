@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELO FIFA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ======================================================================
+     Palette ispirata al Comune di Aprilia (Lazio): blu istituzionale e oro
+     araldico su base scura, stile "scoreboard" da centro sportivo.
+     N.B. non ho potuto verificare i colori ufficiali esatti dello stemma:
+     sono un'approssimazione plausibile. Le variabili qui sotto sono tutte
+     raggruppate proprio per essere facili da correggere in un minuto se
+     vuoi affinarle.
+     ====================================================================== */
+  :root{
+    --bg:#0e1420; --panel:#161d2e; --panel2:#1c2438; --border:#2b3552;
+    --text:#edf1fa; --muted:#8a93ad;
+    --blu:#1e5fa8; --blu-dim:#12294a;
+    --oro:#d8b24a; --oro-dim:#5c4a1e;
+    --verde:#3ddc84; --rosso:#ff5c5c; --pareggio:#8a93ad;
+    --mono:'IBM Plex Mono', monospace; --disp:'Space Grotesk', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;}
+  h1,h2,h3{font-family:var(--disp);}
+  button{cursor:pointer;border:none;border-radius:6px;font-family:var(--mono);font-weight:600;font-size:12.5px;padding:9px 14px;transition:opacity .15s;}
+  button:hover{opacity:.85;} button:active{transform:translateY(1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-blu{background:var(--blu);color:#eaf2ff;}
+  .btn-oro{background:var(--oro);color:#241d08;}
+  .btn-verde{background:var(--verde);color:#08130d;}
+  .btn-rosso{background:var(--rosso);color:#1a0505;}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);}
+  input,select{width:100%;background:#0b1019;border:1px solid var(--border);color:var(--text);padding:9px 11px;border-radius:6px;font-family:var(--mono);font-size:13px;}
+  input:focus,select:focus{outline:none;border-color:var(--oro-dim);}
+  label{display:block;font-size:11px;color:#9aa2ba;margin:9px 0 4px;text-transform:uppercase;letter-spacing:.5px;}
+  .hidden{display:none !important;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;}
+  .panel h2{font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--oro);margin:0 0 12px;display:flex;align-items:center;gap:8px;}
+  .panel h2::before{content:"";width:6px;height:6px;background:var(--oro);border-radius:50%;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .muted{color:#8a93ad99;}
+  .up{color:var(--verde);} .down{color:var(--rosso);} .flat{color:var(--pareggio);}
+  a.link{color:var(--oro);cursor:pointer;text-decoration:underline;font-size:12px;}
+
+  /* header pubblico */
+  header.top{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#101728;position:relative;}
+  header.top::after{content:"";position:absolute;bottom:-1px;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blu),var(--oro),var(--blu));}
+  header.top .brand{font-family:var(--disp);font-size:20px;letter-spacing:.5px;}
+  header.top .brand span{color:var(--oro);}
+  nav.tabs{display:flex;gap:4px;padding:10px 20px;background:#101728;border-bottom:1px solid var(--border);overflow-x:auto;}
+  nav.tabs button{background:transparent;color:#9aa2ba;white-space:nowrap;}
+  nav.tabs button.on{background:var(--panel2);color:var(--oro);}
+  main{max-width:1000px;margin:0 auto;padding:18px 16px 60px;}
+
+  table{border-collapse:collapse;width:100%;font-size:12.5px;}
+  th{text-align:left;color:#9aa2ba;font-weight:500;padding:8px;border-bottom:1px solid var(--border);text-transform:uppercase;font-size:10.5px;letter-spacing:.5px;}
+  td{padding:8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr.me{background:#1c243855;}
+
+  .rankNum{color:var(--oro);font-weight:700;width:22px;display:inline-block;}
+  .avatar-sm{width:26px;height:26px;border-radius:50%;object-fit:cover;background:#0b1019;border:1px solid var(--border);vertical-align:middle;margin-right:8px;}
+  .tier-badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;}
+
+  .feed div{border-bottom:1px dashed var(--border);padding:9px 0;font-size:12px;color:#c7cede;}
+  .feed div b{color:var(--text);}
+  .feed .esito-V{color:var(--verde);font-weight:700;}
+  .feed .esito-P{color:var(--pareggio);font-weight:700;}
+  .feed .esito-S{color:var(--rosso);font-weight:700;}
+  .matchScore{font-family:var(--disp);font-weight:700;font-size:15px;}
+
+  .torneoItem{padding:12px 0;border-bottom:1px solid var(--border);}
+  .torneoItem .nome{font-weight:600;font-size:14px;}
+  .torneoItem .data{color:#9aa2ba;font-size:11px;text-transform:uppercase;}
+
+  .toast{position:fixed;bottom:18px;right:18px;left:18px;margin:0 auto;max-width:320px;background:var(--panel);border:1px solid var(--oro-dim);padding:10px 16px;border-radius:8px;font-size:12.5px;opacity:0;transform:translateY(10px);transition:all .25s;pointer-events:none;z-index:80;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  .modalBg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px;}
+  .modalBox{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;}
+  .modalBox h3{margin-top:0;color:var(--oro);}
+  .closeX{float:right;cursor:pointer;color:#9aa2ba;}
+  .setupWarning{background:#241414;border:1px solid #5c2a2a;color:#f0b9b9;padding:14px;border-radius:8px;font-size:12px;line-height:1.6;margin:16px;}
+
+  /* login admin */
+  #adminLoginScreen{max-width:380px;margin:40px auto;}
+  #adminLoginScreen .box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:26px;position:relative;}
+  #adminLoginScreen .box::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;border-radius:12px 12px 0 0;background:linear-gradient(90deg,var(--blu),var(--oro));}
+  #adminLoginMsg{font-size:12px;margin-top:10px;min-height:16px;}
+  #adminLoginMsg.err{color:var(--rosso);} #adminLoginMsg.ok{color:var(--verde);}
+
+  .cardScore{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .deltaTag{font-size:11px;font-weight:700;padding:1px 6px;border-radius:5px;margin-left:6px;}
+
+  /* barra di ricerca globale */
+  .searchBar{position:relative;margin-bottom:16px;}
+  .searchBar input{padding-left:34px;}
+  .searchBar .ic{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#9aa2ba;font-size:13px;}
+
+  /* layout a 3 colonne: tornei | classifica | partite */
+  .home-grid{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:16px;align-items:start;}
+  .home-grid .panel{margin-bottom:0;}
+  .col-tornei{order:1;} .col-classifica{order:2;} .col-partite{order:3;}
+
+  /* paginazione */
+  .pager{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);}
+  .pager button{background:var(--panel2);color:var(--oro);padding:5px 12px;font-size:11px;}
+  .pager span{font-size:10.5px;color:#9aa2ba;text-transform:uppercase;letter-spacing:.5px;}
+
+  /* footer con le 4 sezioni: chi siamo / regolamento / contatti / altro */
+  footer.siteFooter{max-width:1000px;margin:8px auto 40px;padding:0 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  footer.siteFooter button{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:12px 8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;}
+  footer.siteFooter button:hover{border-color:var(--oro-dim);color:var(--oro);}
+
+  @media (max-width:640px){
+    header.top{padding:12px 14px;} header.top .brand{font-size:17px;}
+    main{padding:14px 10px 50px;} .panel{padding:13px;}
+    table{font-size:11.5px;} th,td{padding:7px 5px;}
+    .modalBox{padding:16px;}
+    .home-grid{grid-template-columns:1fr;}
+    .col-tornei{order:2;} .col-classifica{order:1;} .col-partite{order:3;}
+    footer.siteFooter{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div id="setupWarning" class="setupWarning hidden">
+  ⚠️ <b>Configurazione Firebase mancante.</b> Apri questo file con un editor di testo, cerca <code>firebaseConfig</code>
+  vicino all'inizio dello script e incolla lì i dati del tuo progetto Firebase. Ricorda inoltre che questa pagina va
+  aperta da un hosting <code>https://</code> (es. GitHub Pages), non semplicemente facendo doppio clic sul file.
+</div>
+
+<header class="top">
+  <div class="brand">⚽ ELO <span>FIFA</span></div>
+  <div style="font-size:11.5px;color:#9aa2ba;">
+    <span id="statoAdmin"></span>
+    <a class="link" id="linkAdmin" onclick="vaiTabAdmin()" style="margin-left:8px;">Admin</a>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="on" data-tab="classifica" onclick="cambiaTab('classifica')">Home</button>
+  <button data-tab="admin" onclick="cambiaTab('admin')">Admin</button>
+</nav>
+
+<main>
+
+  <!-- ============ HOME: tornei | classifica | partite (pubblica) ============ -->
+  <div id="tab-classifica" class="tabpane">
+
+    <div class="searchBar">
+      <span class="ic">🔎</span>
+      <input type="text" id="ricercaGlobale" placeholder="Cerca un giocatore o un torneo..." oninput="onRicercaInput(this.value)">
+    </div>
+
+    <div class="home-grid">
+
+      <div class="panel col-tornei">
+        <h2>Ultimi tornei</h2>
+        <div id="torneiLista"><span class="muted">Nessun torneo ancora.</span></div>
+        <div class="pager">
+          <button id="torneiPrevBtn" onclick="cambiaPaginaTornei(-1)">« Pag.</button>
+          <span id="torneiPagLabel">Pag. 1</span>
+          <button id="torneiNextBtn" onclick="cambiaPaginaTornei(1)">Pag. »</button>
+        </div>
+      </div>
+
+      <div class="panel col-classifica">
+        <h2>Classifica Elo</h2>
+        <table>
+          <thead><tr><th>#</th><th>Giocatore</th><th>Fascia</th><th>Elo</th><th>PG</th><th>V-P-S</th></tr></thead>
+          <tbody id="classificaBody"><tr><td colspan="6" class="muted">Caricamento...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="panel col-partite">
+        <h2>Ultime partite</h2>
+        <div class="feed" id="partiteFeed"><span class="muted">Nessuna partita ancora.</span></div>
+        <div class="pager">
+          <button id="partitePrevBtn" onclick="cambiaPaginaPartite(-1)">« Pag.</button>
+          <span id="partitePagLabel">Pag. 1</span>
+          <button id="partiteNextBtn" onclick="cambiaPaginaPartite(1)">Pag. »</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ ADMIN ============ -->
+  <div id="tab-admin" class="tabpane hidden">
+
+    <div id="adminLoginScreen">
+      <div class="box">
+        <h1 style="font-size:22px;margin:0 0 4px;">Area <span style="color:var(--oro);">Admin</span></h1>
+        <div class="muted" style="margin-bottom:16px;">Gestione giocatori, partite e tornei.</div>
+        <label>Password amministratore</label>
+        <input type="password" id="adminPassInput" autocomplete="current-password">
+        <button class="btn-blu" style="width:100%;margin-top:16px;" onclick="eseguiLoginAdmin()">Entra</button>
+        <div id="adminLoginMsg"></div>
+      </div>
+    </div>
+
+    <div id="adminPannello" class="hidden">
+      <div class="panel" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div>Connesso come <b style="color:var(--oro);">Admin</b></div>
+        <a class="link" onclick="logoutAdmin()">esci</a>
+      </div>
+
+      <div class="panel">
+        <h2>Registra una partita</h2>
+        <label>Giocatore A</label><select id="mA"></select>
+        <div class="row2">
+          <div><label>Gol A</label><input type="number" id="mGolA" value="0" min="0" step="1"></div>
+          <div><label>Gol B</label><input type="number" id="mGolB" value="0" min="0" step="1"></div>
+        </div>
+        <label>Giocatore B</label><select id="mB"></select>
+        <label>Torneo (facoltativo)</label><select id="mTorneo"><option value="">— nessuno —</option></select>
+        <button class="btn-verde" style="width:100%;margin-top:14px;" onclick="registraPartita()">Salva partita e aggiorna Elo</button>
+      </div>
+
+      <div class="panel">
+        <h2>Giocatori</h2>
+        <label>Nome nuovo giocatore</label>
+        <div class="row2">
+          <input type="text" id="nuovoGiocatoreNome" placeholder="Nome">
+          <button class="btn-oro" onclick="aggiungiGiocatore()">Aggiungi</button>
+        </div>
+        <div id="listaGiocatoriAdmin" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Tornei</h2>
+        <label>Nome torneo</label>
+        <div class="row2">
+          <input type="text" id="nuovoTorneoNome" placeholder="Es. Torneo di Natale">
+          <input type="date" id="nuovoTorneoData">
+        </div>
+        <button class="btn-oro" style="width:100%;margin-top:10px;" onclick="aggiungiTorneo()">Crea torneo</button>
+        <div id="listaTorneiAdmin" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Contenuti pagina pubblica</h2>
+        <label>Testo "Chi siamo" (mostrato in una vignetta a chi clicca il pulsante)</label>
+        <input type="text" id="cfgChiSiamo" placeholder="Es. Siamo un gruppo di amici che gioca a FIFA ogni settimana...">
+        <label>Link del regolamento (es. link a Google Drive)</label>
+        <input type="text" id="cfgRegolamentoUrl" placeholder="https://drive.google.com/...">
+        <label>Email per i contatti</label>
+        <input type="text" id="cfgContattiEmail" placeholder="tuaemail@esempio.it">
+        <button class="btn-blu" style="width:100%;margin-top:12px;" onclick="salvaContenuti()">Salva contenuti</button>
+        <div class="muted" style="font-size:10.5px;margin-top:8px;">Il pulsante "Altro" nel footer è fisso e porta a una sorpresa 😉, non è modificabile da qui.</div>
+      </div>
+
+      <div class="panel">
+        <h2>Impostazioni</h2>
+        <label>Elo iniziale per i nuovi giocatori</label>
+        <input type="number" id="cfgEloIniziale" value="1000" step="10">
+        <label>Fattore K (quanto pesa ogni partita)</label>
+        <input type="number" id="cfgK" value="32" step="1">
+        <button class="btn-blu" style="width:100%;margin-top:12px;" onclick="salvaConfig()">Salva impostazioni</button>
+
+        <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+          <label style="margin-top:0;">Fasce (soglia minima di Elo → nome fascia)</label>
+          <div id="listaFasce"></div>
+          <button class="btn-ghost" style="margin-top:8px;" onclick="aggiungiFasciaVuota()">+ aggiungi fascia</button>
+          <button class="btn-oro" style="width:100%;margin-top:10px;" onclick="salvaFasce()">Salva fasce</button>
+        </div>
+
+        <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+          <label style="margin-top:0;">Cambia la password amministratore</label>
+          <input type="password" id="cfgNuovaPass" placeholder="Nuova password (min. 4 caratteri)">
+          <button class="btn-rosso" style="width:100%;margin-top:10px;" onclick="cambiaPasswordAdmin()">Aggiorna password</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="siteFooter">
+  <button onclick="apriChiSiamo()">Chi siamo</button>
+  <button onclick="apriRegolamento()">Regolamento</button>
+  <button onclick="apriContatti()">Contatti</button>
+  <button onclick="apriAltro()">Altro</button>
+</footer>
+
+<div id="modalRoot"></div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+/* =====================================================================
+   1) INCOLLA QUI LA CONFIGURAZIONE DEL TUO PROGETTO FIREBASE
+   (Console Firebase → Impostazioni progetto → Le tue app → Web app → SDK config)
+   ===================================================================== */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, get, set, update, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCiYN6Gd6C3dd0TgFoqUQe_G9fG966GoQA",
+  authDomain: "elofifa-31cc1.firebaseapp.com",
+  databaseURL: "elofifa.europe-west1.firebasedatabase.app",
+  projectId: "elofifa-31cc1",
+  storageBucket: "elofifa-31cc1.firebasestorage.app",
+  messagingSenderId: "476459597043",
+  appId: "1:476459597043:web:b2c4f7ca631f5945030b86"
+};
+/* ===================================================================== */
+
+let db = null, firebaseOk = false;
+try{
+  if(firebaseConfig.apiKey && firebaseConfig.apiKey !== "INCOLLA_QUI"){
+    const fbApp = initializeApp(firebaseConfig);
+    db = getDatabase(fbApp);
+    firebaseOk = true;
+  }
+}catch(e){ console.error(e); }
+if(!firebaseOk) document.getElementById('setupWarning').classList.remove('hidden');
+
+/* ---------------- stato locale ---------------- */
+let CONFIG = { eloIniziale:1000, k:32, chiSiamoTesto:'', regolamentoUrl:'', contattiEmail:'' };
+let FASCE = [
+  { soglia:0,    nome:'Bronzo',   colore:'#a9673a' },
+  { soglia:900,  nome:'Argento',  colore:'#9aa2ba' },
+  { soglia:1000, nome:'Oro',      colore:'#d8b24a' },
+  { soglia:1100, nome:'Platino',  colore:'#4fb3bf' },
+  { soglia:1200, nome:'Diamante', colore:'#7d9dff' }
+];
+let GIOCATORI = {};  // id -> {nome, elo, pg, v, p, s, ultimoDelta}
+let PARTITE = [];    // array ordinato per timestamp
+let TORNEI = {};
+let sessioneAdmin = false;
+
+/* ricerca globale + paginazione delle colonne tornei/partite */
+let ricercaQuery = '';
+let paginaTornei = 1, paginaPartite = 1;
+const RIGHE_PER_PAGINA = 5;
+const RICKROLL_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+
+/* ---------------- utilità ---------------- */
+async function sha256(testo){
+  const enc = new TextEncoder().encode(testo);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function mostraToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function apriModal(titolo, html){
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modalBg" onclick="if(event.target===this) chiudiModal()">
+      <div class="modalBox"><span class="closeX" onclick="chiudiModal()">✕</span><h3>${titolo}</h3>${html}</div>
+    </div>`;
+}
+window.chiudiModal = function(){ document.getElementById('modalRoot').innerHTML=''; }
+
+function fasciaDi(elo){
+  let scelta = FASCE[0] || {nome:'—',colore:'#9aa2ba'};
+  for(const f of FASCE){ if(elo >= f.soglia) scelta = f; }
+  return scelta;
+}
+function matchRicerca(testo){
+  if(!ricercaQuery) return true;
+  return (testo||'').toLowerCase().includes(ricercaQuery.toLowerCase());
+}
+
+/* =====================================================================
+   CARICAMENTO DATI (in tempo reale da Firebase)
+   ===================================================================== */
+function attaccaListeners(){
+  if(!firebaseOk) return;
+  onValue(ref(db,'config'), snap=>{
+    const v = snap.val();
+    if(v){
+      CONFIG = {
+        eloIniziale: v.eloIniziale ?? 1000, k: v.k ?? 32,
+        chiSiamoTesto: v.chiSiamoTesto || '',
+        regolamentoUrl: v.regolamentoUrl || '',
+        contattiEmail: v.contattiEmail || ''
+      };
+    }
+    if(v && v.fasce) FASCE = v.fasce;
+    renderClassifica(); renderAdminFasce();
+  });
+  onValue(ref(db,'giocatori'), snap=>{
+    GIOCATORI = snap.val() || {};
+    renderClassifica(); popolaSelectGiocatori();
+  });
+  onValue(ref(db,'partite'), snap=>{
+    const v = snap.val() || {};
+    PARTITE = Object.keys(v).map(id=>({id, ...v[id]})).sort((a,b)=>b.timestamp-a.timestamp);
+    renderPartite();
+  });
+  onValue(ref(db,'tornei'), snap=>{
+    TORNEI = snap.val() || {};
+    renderTornei(); popolaSelectTornei();
+  });
+}
+attaccaListeners();
+
+/* =====================================================================
+   TAB NAVIGATION
+   ===================================================================== */
+window.cambiaTab = function(nome){
+  document.querySelectorAll('.tabpane').forEach(el=>el.classList.add('hidden'));
+  document.getElementById('tab-'+nome).classList.remove('hidden');
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===nome));
+}
+window.vaiTabAdmin = function(){ cambiaTab('admin'); document.querySelector('[data-tab=admin]').classList.add('on'); }
+
+/* =====================================================================
+   RENDER: CLASSIFICA
+   ===================================================================== */
+function renderClassifica(){
+  const body = document.getElementById('classificaBody');
+  let lista = Object.keys(GIOCATORI).map(id=>({id, ...GIOCATORI[id]}));
+  if(!lista.length){ body.innerHTML = '<tr><td colspan="6" class="muted">Nessun giocatore ancora.</td></tr>'; return; }
+  lista.sort((a,b)=>(b.elo||0)-(a.elo||0));
+  const listaCompleta = lista; // usata per mantenere la posizione # anche filtrando
+  lista = lista.filter(g=>matchRicerca(g.nome));
+  if(!lista.length){ body.innerHTML = '<tr><td colspan="6" class="muted">Nessun giocatore corrisponde alla ricerca.</td></tr>'; return; }
+  body.innerHTML = lista.map(g=>{
+    const i = listaCompleta.findIndex(x=>x.id===g.id);
+    const f = fasciaDi(g.elo||0);
+    const delta = g.ultimoDelta||0;
+    const deltaHtml = delta ? `<span class="deltaTag ${delta>0?'up':'down'}">${delta>0?'▲':'▼'} ${Math.abs(delta)}</span>` : '';
+    return `<tr>
+      <td><span class="rankNum">${i+1}</span></td>
+      <td>${g.avatarUrl?`<img class="avatar-sm" src="${g.avatarUrl}">`:''}${g.nome}</td>
+      <td><span class="tier-badge" style="background:${f.colore}33;color:${f.colore};">${f.nome}</span></td>
+      <td><b>${Math.round(g.elo||0)}</b>${deltaHtml}</td>
+      <td>${g.pg||0}</td>
+      <td>${g.v||0}-${g.p||0}-${g.s||0}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* =====================================================================
+   RENDER: PARTITE
+   ===================================================================== */
+function esitoLettera(golA,golB){ return golA>golB?'V':(golA<golB?'S':'P'); }
+function renderPartite(){
+  const el = document.getElementById('partiteFeed');
+  let lista = PARTITE.filter(p=>{
+    const nomeA = (GIOCATORI[p.giocatoreA]||{}).nome || '';
+    const nomeB = (GIOCATORI[p.giocatoreB]||{}).nome || '';
+    const nomeTorneo = p.torneoId && TORNEI[p.torneoId] ? TORNEI[p.torneoId].nome : '';
+    return matchRicerca(nomeA) || matchRicerca(nomeB) || matchRicerca(nomeTorneo);
+  });
+  if(!PARTITE.length){ el.innerHTML = '<span class="muted">Nessuna partita ancora.</span>'; aggiornaPagerPartite(1,1); return; }
+  if(!lista.length){ el.innerHTML = '<span class="muted">Nessuna partita corrisponde alla ricerca.</span>'; aggiornaPagerPartite(1,1); return; }
+
+  const totalePagine = Math.max(1, Math.ceil(lista.length / RIGHE_PER_PAGINA));
+  if(paginaPartite > totalePagine) paginaPartite = totalePagine;
+  const inizio = (paginaPartite-1) * RIGHE_PER_PAGINA;
+  const paginaCorrente = lista.slice(inizio, inizio + RIGHE_PER_PAGINA);
+
+  el.innerHTML = paginaCorrente.map(p=>{
+    const nomeA = (GIOCATORI[p.giocatoreA]||{}).nome || '—';
+    const nomeB = (GIOCATORI[p.giocatoreB]||{}).nome || '—';
+    const data = new Date(p.timestamp).toLocaleDateString('it-IT');
+    const torneo = p.torneoId && TORNEI[p.torneoId] ? ` · ${TORNEI[p.torneoId].nome}` : '';
+    const dA = p.eloA_dopo - p.eloA_prima, dB = p.eloB_dopo - p.eloB_prima;
+    return `<div>
+      <div class="cardScore">
+        <span><b>${nomeA}</b> <span class="matchScore">${p.golA} - ${p.golB}</span> <b>${nomeB}</b></span>
+        <span class="muted">${data}${torneo}</span>
+      </div>
+      <div style="margin-top:4px;">
+        ${nomeA}: <span class="${dA>0?'up':(dA<0?'down':'flat')}">${dA>=0?'+':''}${dA}</span> (${Math.round(p.eloA_prima)}→${Math.round(p.eloA_dopo)}) &nbsp;·&nbsp;
+        ${nomeB}: <span class="${dB>0?'up':(dB<0?'down':'flat')}">${dB>=0?'+':''}${dB}</span> (${Math.round(p.eloB_prima)}→${Math.round(p.eloB_dopo)})
+      </div>
+    </div>`;
+  }).join('');
+  aggiornaPagerPartite(paginaPartite, totalePagine);
+}
+function aggiornaPagerPartite(pag, totale){
+  document.getElementById('partitePagLabel').textContent = `Pag. ${pag}/${totale}`;
+  document.getElementById('partitePrevBtn').disabled = pag<=1;
+  document.getElementById('partiteNextBtn').disabled = pag>=totale;
+}
+window.cambiaPaginaPartite = function(delta){ paginaPartite += delta; renderPartite(); }
+
+/* =====================================================================
+   RENDER: TORNEI
+   ===================================================================== */
+function renderTornei(){
+  const el = document.getElementById('torneiLista');
+  const listaCompleta = Object.keys(TORNEI).map(id=>({id, ...TORNEI[id]})).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+  const lista = listaCompleta.filter(t=>matchRicerca(t.nome));
+  if(!listaCompleta.length){ el.innerHTML = '<span class="muted">Nessun torneo ancora.</span>'; aggiornaPagerTornei(1,1); return; }
+  if(!lista.length){ el.innerHTML = '<span class="muted">Nessun torneo corrisponde alla ricerca.</span>'; aggiornaPagerTornei(1,1); return; }
+
+  const totalePagine = Math.max(1, Math.ceil(lista.length / RIGHE_PER_PAGINA));
+  if(paginaTornei > totalePagine) paginaTornei = totalePagine;
+  const inizio = (paginaTornei-1) * RIGHE_PER_PAGINA;
+  const paginaCorrente = lista.slice(inizio, inizio + RIGHE_PER_PAGINA);
+
+  el.innerHTML = paginaCorrente.map(t=>`
+    <div class="torneoItem">
+      <div class="nome">${t.nome}</div>
+      <div class="data">${t.data ? new Date(t.data).toLocaleDateString('it-IT') : '—'}</div>
+    </div>`).join('');
+  aggiornaPagerTornei(paginaTornei, totalePagine);
+}
+function aggiornaPagerTornei(pag, totale){
+  document.getElementById('torneiPagLabel').textContent = `Pag. ${pag}/${totale}`;
+  document.getElementById('torneiPrevBtn').disabled = pag<=1;
+  document.getElementById('torneiNextBtn').disabled = pag>=totale;
+}
+window.cambiaPaginaTornei = function(delta){ paginaTornei += delta; renderTornei(); }
+
+/* =====================================================================
+   RICERCA GLOBALE
+   ===================================================================== */
+window.onRicercaInput = function(valore){
+  ricercaQuery = valore.trim();
+  paginaTornei = 1; paginaPartite = 1;
+  renderClassifica(); renderPartite(); renderTornei();
+}
+
+/* =====================================================================
+   FOOTER: chi siamo / regolamento / contatti / altro
+   ===================================================================== */
+window.apriChiSiamo = function(){
+  const testo = CONFIG.chiSiamoTesto && CONFIG.chiSiamoTesto.trim()
+    ? CONFIG.chiSiamoTesto
+    : 'Il testo di presentazione non è stato ancora impostato. Un admin può aggiungerlo dal pannello Admin → Contenuti pagina pubblica.';
+  apriModal('Chi siamo', `<div style="line-height:1.6;font-size:13px;">${testo}</div>`);
+}
+window.apriRegolamento = function(){
+  if(CONFIG.regolamentoUrl && CONFIG.regolamentoUrl.trim()){
+    window.open(CONFIG.regolamentoUrl, '_blank');
+  } else {
+    mostraToast('Nessun link al regolamento impostato. Un admin può aggiungerlo dal pannello Admin.');
+  }
+}
+window.apriContatti = function(){
+  if(CONFIG.contattiEmail && CONFIG.contattiEmail.trim()){
+    window.location.href = 'mailto:' + CONFIG.contattiEmail;
+  } else {
+    mostraToast('Nessuna email di contatto impostata. Un admin può aggiungerla dal pannello Admin.');
+  }
+}
+window.apriAltro = function(){
+  window.open(RICKROLL_URL, '_blank');
+}
+
+/* =====================================================================
+   ADMIN: LOGIN (prima configurazione + accesso)
+   ===================================================================== */
+async function controllaPrimoAvvio(){
+  if(!firebaseOk) return;
+  const snap = await get(ref(db,'config/adminPassHash'));
+  if(!snap.exists()){
+    const pass = prompt('Primo avvio rilevato: imposta ora la password amministratore per questo sito. Rimarrà valida finché non la cambi dal pannello Admin.');
+    if(pass && pass.length>=4){
+      const hash = await sha256(pass);
+      await update(ref(db,'config'), { eloIniziale:1000, k:32, fasce:FASCE, adminPassHash: hash });
+      mostraToast('Password amministratore impostata. Ora puoi accedere dalla tab Admin.');
+    }
+  }
+}
+controllaPrimoAvvio();
+
+window.eseguiLoginAdmin = async function(){
+  const msg = document.getElementById('adminLoginMsg');
+  msg.className=''; msg.textContent='';
+  if(!firebaseOk){ msg.className='err'; msg.textContent='Firebase non configurato.'; return; }
+  const pass = document.getElementById('adminPassInput').value;
+  const snap = await get(ref(db,'config/adminPassHash'));
+  if(!snap.exists()){ msg.className='err'; msg.textContent='Nessuna password impostata ancora: ricarica la pagina.'; return; }
+  const hash = await sha256(pass);
+  if(hash === snap.val()){
+    sessioneAdmin = true;
+    document.getElementById('adminLoginScreen').classList.add('hidden');
+    document.getElementById('adminPannello').classList.remove('hidden');
+    document.getElementById('statoAdmin').textContent = '🔓 admin';
+    renderAdminPannello();
+  } else { msg.className='err'; msg.textContent='Password errata.'; }
+}
+window.logoutAdmin = function(){
+  sessioneAdmin = false;
+  document.getElementById('adminLoginScreen').classList.remove('hidden');
+  document.getElementById('adminPannello').classList.add('hidden');
+  document.getElementById('adminPassInput').value='';
+  document.getElementById('statoAdmin').textContent = '';
+}
+
+function renderAdminPannello(){
+  popolaSelectGiocatori(); popolaSelectTornei(); renderGiocatoriAdmin(); renderTorneiAdmin();
+  document.getElementById('cfgEloIniziale').value = CONFIG.eloIniziale;
+  document.getElementById('cfgK').value = CONFIG.k;
+  document.getElementById('cfgChiSiamo').value = CONFIG.chiSiamoTesto || '';
+  document.getElementById('cfgRegolamentoUrl').value = CONFIG.regolamentoUrl || '';
+  document.getElementById('cfgContattiEmail').value = CONFIG.contattiEmail || '';
+  renderAdminFasce();
+}
+
+/* =====================================================================
+   ADMIN: GIOCATORI
+   ===================================================================== */
+function popolaSelectGiocatori(){
+  const opz = Object.keys(GIOCATORI).map(id=>`<option value="${id}">${GIOCATORI[id].nome}</option>`).join('');
+  ['mA','mB'].forEach(sid=>{ const el=document.getElementById(sid); if(el) el.innerHTML = opz || '<option value="">— nessun giocatore —</option>'; });
+}
+function renderGiocatoriAdmin(){
+  const el = document.getElementById('listaGiocatoriAdmin');
+  const lista = Object.keys(GIOCATORI).map(id=>({id,...GIOCATORI[id]})).sort((a,b)=>(b.elo||0)-(a.elo||0));
+  if(!lista.length){ el.innerHTML = '<span class="muted">Nessun giocatore ancora.</span>'; return; }
+  el.innerHTML = lista.map(g=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap;">
+      <span>${g.nome} — ${Math.round(g.elo||0)} pt</span>
+      <span><button class="btn-ghost" onclick="eliminaGiocatore('${g.id}')">🗑 Elimina</button></span>
+    </div>`).join('');
+}
+window.aggiungiGiocatore = async function(){
+  const nome = document.getElementById('nuovoGiocatoreNome').value.trim();
+  if(!nome){ mostraToast('Inserisci un nome.'); return; }
+  await push(ref(db,'giocatori'), { nome, elo: CONFIG.eloIniziale, pg:0, v:0, p:0, s:0, ultimoDelta:0, creato: Date.now() });
+  document.getElementById('nuovoGiocatoreNome').value='';
+  mostraToast('Giocatore aggiunto.');
+}
+window.eliminaGiocatore = async function(id){
+  if(!confirm('Eliminare questo giocatore? Le partite già registrate restano nello storico.')) return;
+  await remove(ref(db,'giocatori/'+id));
+  mostraToast('Giocatore eliminato.');
+}
+
+/* =====================================================================
+   ADMIN: TORNEI
+   ===================================================================== */
+function popolaSelectTornei(){
+  const el = document.getElementById('mTorneo');
+  const opz = Object.keys(TORNEI).map(id=>`<option value="${id}">${TORNEI[id].nome}</option>`).join('');
+  el.innerHTML = '<option value="">— nessuno —</option>' + opz;
+}
+function renderTorneiAdmin(){
+  const el = document.getElementById('listaTorneiAdmin');
+  const lista = Object.keys(TORNEI).map(id=>({id,...TORNEI[id]})).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+  if(!lista.length){ el.innerHTML = '<span class="muted">Nessun torneo ancora.</span>'; return; }
+  el.innerHTML = lista.map(t=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap;">
+      <span>${t.nome} <span class="muted">${t.data?new Date(t.data).toLocaleDateString('it-IT'):''}</span></span>
+      <button class="btn-ghost" onclick="eliminaTorneo('${t.id}')">🗑 Elimina</button>
+    </div>`).join('');
+}
+window.aggiungiTorneo = async function(){
+  const nome = document.getElementById('nuovoTorneoNome').value.trim();
+  const data = document.getElementById('nuovoTorneoData').value;
+  if(!nome){ mostraToast('Inserisci un nome torneo.'); return; }
+  await push(ref(db,'tornei'), { nome, data: data||null, timestamp: Date.now() });
+  document.getElementById('nuovoTorneoNome').value=''; document.getElementById('nuovoTorneoData').value='';
+  mostraToast('Torneo creato.');
+}
+window.eliminaTorneo = async function(id){
+  if(!confirm('Eliminare questo torneo?')) return;
+  await remove(ref(db,'tornei/'+id));
+  mostraToast('Torneo eliminato.');
+}
+
+/* =====================================================================
+   REGISTRA PARTITA + CALCOLO ELO
+   Formula Elo standard: atteso_A = 1/(1+10^((eloB-eloA)/400))
+   nuovo_eloA = eloA + K*(risultato_A - atteso_A)   risultato: 1 vittoria, 0.5 pareggio, 0 sconfitta
+   ===================================================================== */
+window.registraPartita = async function(){
+  const idA = document.getElementById('mA').value;
+  const idB = document.getElementById('mB').value;
+  const golA = parseInt(document.getElementById('mGolA').value);
+  const golB = parseInt(document.getElementById('mGolB').value);
+  const torneoId = document.getElementById('mTorneo').value || null;
+  if(!idA || !idB || idA===idB){ mostraToast('Seleziona due giocatori diversi.'); return; }
+  if(isNaN(golA) || isNaN(golB) || golA<0 || golB<0){ mostraToast('Punteggio non valido.'); return; }
+
+  const gA = GIOCATORI[idA], gB = GIOCATORI[idB];
+  const eloA = gA.elo||CONFIG.eloIniziale, eloB = gB.elo||CONFIG.eloIniziale;
+  const attesoA = 1/(1+Math.pow(10,(eloB-eloA)/400));
+  const attesoB = 1 - attesoA;
+  const risA = golA>golB ? 1 : (golA<golB ? 0 : 0.5);
+  const risB = 1 - risA;
+  const K = CONFIG.k || 32;
+  const nuovoEloA = eloA + K*(risA-attesoA);
+  const nuovoEloB = eloB + K*(risB-attesoB);
+
+  await push(ref(db,'partite'), {
+    giocatoreA:idA, giocatoreB:idB, golA, golB, torneoId,
+    eloA_prima:eloA, eloB_prima:eloB, eloA_dopo:nuovoEloA, eloB_dopo:nuovoEloB,
+    timestamp: Date.now()
+  });
+
+  await update(ref(db,'giocatori/'+idA), {
+    elo: nuovoEloA, pg:(gA.pg||0)+1, v:(gA.v||0)+(risA===1?1:0), p:(gA.p||0)+(risA===0.5?1:0), s:(gA.s||0)+(risA===0?1:0),
+    ultimoDelta: Math.round(nuovoEloA-eloA)
+  });
+  await update(ref(db,'giocatori/'+idB), {
+    elo: nuovoEloB, pg:(gB.pg||0)+1, v:(gB.v||0)+(risB===1?1:0), p:(gB.p||0)+(risB===0.5?1:0), s:(gB.s||0)+(risB===0?1:0),
+    ultimoDelta: Math.round(nuovoEloB-eloB)
+  });
+
+  document.getElementById('mGolA').value=0; document.getElementById('mGolB').value=0;
+  mostraToast('Partita registrata, Elo aggiornato.');
+}
+
+/* =====================================================================
+   ADMIN: CONTENUTI PAGINA PUBBLICA (chi siamo, regolamento, contatti)
+   ===================================================================== */
+window.salvaContenuti = async function(){
+  const chiSiamoTesto = document.getElementById('cfgChiSiamo').value.trim();
+  const regolamentoUrl = document.getElementById('cfgRegolamentoUrl').value.trim();
+  const contattiEmail = document.getElementById('cfgContattiEmail').value.trim();
+  await update(ref(db,'config'), { chiSiamoTesto, regolamentoUrl, contattiEmail });
+  mostraToast('Contenuti salvati.');
+}
+
+/* =====================================================================
+   ADMIN: IMPOSTAZIONI (elo iniziale, K, fasce, password)
+   ===================================================================== */
+window.salvaConfig = async function(){
+  const eloIniziale = parseFloat(document.getElementById('cfgEloIniziale').value) || 1000;
+  const k = parseFloat(document.getElementById('cfgK').value) || 32;
+  await update(ref(db,'config'), { eloIniziale, k });
+  mostraToast('Impostazioni salvate.');
+}
+
+function renderAdminFasce(){
+  const el = document.getElementById('listaFasce');
+  if(!el) return;
+  el.innerHTML = FASCE.map((f,i)=>`
+    <div class="row2" style="margin-top:6px;align-items:center;">
+      <input type="number" value="${f.soglia}" onchange="modificaFascia(${i},'soglia',this.value)" placeholder="Soglia Elo">
+      <input type="text" value="${f.nome}" onchange="modificaFascia(${i},'nome',this.value)" placeholder="Nome fascia">
+    </div>`).join('');
+}
+window.modificaFascia = function(i, campo, valore){
+  FASCE[i][campo] = campo==='soglia' ? parseFloat(valore)||0 : valore;
+}
+window.aggiungiFasciaVuota = function(){
+  FASCE.push({soglia:0, nome:'Nuova fascia', colore:'#7d9dff'});
+  renderAdminFasce();
+}
+window.salvaFasce = async function(){
+  FASCE.sort((a,b)=>a.soglia-b.soglia);
+  await update(ref(db,'config'), { fasce: FASCE });
+  mostraToast('Fasce salvate.');
+}
+
+window.cambiaPasswordAdmin = async function(){
+  const nuova = document.getElementById('cfgNuovaPass').value;
+  if(!nuova || nuova.length<4){ mostraToast('Almeno 4 caratteri.'); return; }
+  const hash = await sha256(nuova);
+  await set(ref(db,'config/adminPassHash'), hash);
+  document.getElementById('cfgNuovaPass').value='';
+  mostraToast('Password amministratore aggiornata.');
+}
+</script>
+</body>
+</html>
