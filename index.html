@@ -75,6 +75,13 @@
   .tipo-amichevole{background:#3ddc8433;color:var(--verde);}
   .tipo-finale{background:#d8b24a33;color:var(--oro);}
   .tipo-finale3{background:#1e5fa855;color:#8fb8ea;}
+  .tipo-eliminazione{background:#ff5c5c33;color:var(--rosso);}
+  .moltBadge{font-size:9.5px;color:var(--oro);font-weight:700;margin-left:4px;}
+  .posizioniList{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-top:8px;max-height:260px;overflow-y:auto;}
+  .posizioniList span{font-size:12.5px;}
+  .posizioniList input{width:70px;}
+  .podio{font-size:11px;color:#9aa2ba;margin-top:4px;}
+  .podio b{color:var(--oro);}
   .torneoItem{padding:12px 0;border-bottom:1px solid var(--border);}
   .torneoItem .nome{font-weight:600;font-size:14px;}
   .torneoItem .data{color:#9aa2ba;font-size:11px;text-transform:uppercase;}
@@ -204,6 +211,7 @@
           <option value="amichevole">Amichevole</option>
           <option value="finale">Finale</option>
           <option value="finale3">Finale 3° posto</option>
+          <option value="eliminazione">Eliminazione diretta</option>
         </select>
         <div class="muted" id="mTipoKPreview" style="font-size:10.5px;margin-top:6px;"></div>
         <button class="btn-verde" style="width:100%;margin-top:14px;" onclick="registraPartita()">Salva partita e aggiorna Elo</button>
@@ -263,6 +271,25 @@
           <div class="kField">
             <label>Finale 3° posto</label>
             <input type="number" id="cfgKFinale3" value="35" step="1">
+          </div>
+          <div class="kField">
+            <label>Eliminazione diretta</label>
+            <input type="number" id="cfgKEliminazione" value="36" step="1">
+          </div>
+        </div>
+
+        <label style="margin-top:14px;">Moltiplicatore K per i giocatori nuovi</label>
+        <div class="muted" style="font-size:10.5px;margin-bottom:8px;">
+          Si applica in automatico e individualmente a ciascun giocatore in base a quante partite ha già giocato lui (non conta il tipo di partita). Es. se Mario è alla sua 3ª partita e Luigi è alla sua 20ª, solo il K di Mario viene moltiplicato.
+        </div>
+        <div class="row2">
+          <div class="kField">
+            <label>Moltiplicatore 1ª–5ª partita</label>
+            <input type="number" id="cfgMoltPrimeCinque" value="2" step="0.1" min="1">
+          </div>
+          <div class="kField">
+            <label>Moltiplicatore 6ª–10ª partita</label>
+            <input type="number" id="cfgMoltSeiDieci" value="1.5" step="0.1" min="1">
           </div>
         </div>
         <button class="btn-blu" style="width:100%;margin-top:12px;" onclick="salvaConfig()">Salva impostazioni</button>
@@ -325,20 +352,32 @@ if(!firebaseOk) document.getElementById('setupWarning').classList.remove('hidden
    cambiare questi valori in futuro non altera mai le partite già registrate. */
 let CONFIG = {
   eloIniziale:1000,
-  kNormale:32, kAmichevole:20, kFinale:40, kFinale3:35,
+  kNormale:32, kAmichevole:20, kFinale:40, kFinale3:35, kEliminazione:36,
+  moltPrimeCinque:2, moltSeiDieci:1.5,
   chiSiamoTesto:'', regolamentoUrl:'', contattiEmail:''
 };
 const TIPI_PARTITA = {
-  normale:   { label:'Normale',          cssClass:'tipo-normale'   },
-  amichevole:{ label:'Amichevole',       cssClass:'tipo-amichevole'},
-  finale:    { label:'Finale',           cssClass:'tipo-finale'    },
-  finale3:   { label:'Finale 3° posto',  cssClass:'tipo-finale3'   }
+  normale:     { label:'Normale',             cssClass:'tipo-normale'     },
+  amichevole:  { label:'Amichevole',          cssClass:'tipo-amichevole'  },
+  finale:      { label:'Finale',              cssClass:'tipo-finale'     },
+  finale3:     { label:'Finale 3° posto',     cssClass:'tipo-finale3'    },
+  eliminazione:{ label:'Eliminazione diretta',cssClass:'tipo-eliminazione'}
 };
 function kPerTipo(tipo){
   if(tipo==='amichevole') return CONFIG.kAmichevole ?? 20;
   if(tipo==='finale') return CONFIG.kFinale ?? 40;
   if(tipo==='finale3') return CONFIG.kFinale3 ?? 35;
+  if(tipo==='eliminazione') return CONFIG.kEliminazione ?? 36;
   return CONFIG.kNormale ?? 32; // 'normale' o valore mancante/sconosciuto
+}
+/* Moltiplicatore individuale in base a quante partite quel giocatore ha già
+   giocato PRIMA di questa (gA.pg / gB.pg): 1ª-5ª partita del giocatore -> moltiplicatore alto,
+   6ª-10ª -> moltiplicatore medio, dalla 11ª in poi -> nessun moltiplicatore (x1). */
+function moltiplicatorePerEsperienza(partiteGiaGiocate){
+  const pg = partiteGiaGiocate || 0;
+  if(pg < 5) return CONFIG.moltPrimeCinque ?? 2;
+  if(pg < 10) return CONFIG.moltSeiDieci ?? 1.5;
+  return 1;
 }
 let FASCE = [
   { soglia:0,    nome:'Bronzo',   colore:'#a9673a' },
@@ -398,6 +437,9 @@ function attaccaListeners(){
         kAmichevole: v.kAmichevole ?? 20,
         kFinale: v.kFinale ?? 40,
         kFinale3: v.kFinale3 ?? 35,
+        kEliminazione: v.kEliminazione ?? 36,
+        moltPrimeCinque: v.moltPrimeCinque ?? 2,
+        moltSeiDieci: v.moltSeiDieci ?? 1.5,
         chiSiamoTesto: v.chiSiamoTesto || '',
         regolamentoUrl: v.regolamentoUrl || '',
         contattiEmail: v.contattiEmail || ''
@@ -481,7 +523,10 @@ function renderPartite(){
     const torneo = p.torneoId && TORNEI[p.torneoId] ? ` · ${TORNEI[p.torneoId].nome}` : '';
     const dA = p.eloA_dopo - p.eloA_prima, dB = p.eloB_dopo - p.eloB_prima;
     const tipoInfo = TIPI_PARTITA[p.tipo] || TIPI_PARTITA.normale;
-    const tipoBadge = `<span class="tipoBadge ${tipoInfo.cssClass}">${tipoInfo.label}${p.kUsato?` · K${p.kUsato}`:''}</span>`;
+    const tipoBadge = `<span class="tipoBadge ${tipoInfo.cssClass}">${tipoInfo.label}</span>`;
+    const kDettaglio = (p.kUsatoA!=null || p.kUsatoB!=null)
+      ? `<span class="muted" style="font-size:10.5px;">K: ${nomeA} ${Math.round((p.kUsatoA??p.kUsato??0)*10)/10}${p.moltA>1?` (x${p.moltA})`:''} · ${nomeB} ${Math.round((p.kUsatoB??p.kUsato??0)*10)/10}${p.moltB>1?` (x${p.moltB})`:''}</span>`
+      : (p.kUsato ? `<span class="muted" style="font-size:10.5px;">K${p.kUsato}</span>` : '');
     return `<div>
       <div class="cardScore">
         <span><b>${nomeA}</b> <span class="matchScore">${p.golA} - ${p.golB}</span> <b>${nomeB}</b>${tipoBadge}</span>
@@ -491,6 +536,7 @@ function renderPartite(){
         ${nomeA}: <span class="${dA>0?'up':(dA<0?'down':'flat')}">${dA>=0?'+':''}${dA}</span> (${Math.round(p.eloA_prima)}→${Math.round(p.eloA_dopo)}) &nbsp;·&nbsp;
         ${nomeB}: <span class="${dB>0?'up':(dB<0?'down':'flat')}">${dB>=0?'+':''}${dB}</span> (${Math.round(p.eloB_prima)}→${Math.round(p.eloB_dopo)})
       </div>
+      <div style="margin-top:2px;">${kDettaglio}</div>
     </div>`;
   }).join('');
   aggiornaPagerPartite(paginaPartite, totalePagine);
@@ -514,11 +560,24 @@ function renderTornei(){
   if(paginaTornei > totalePagine) paginaTornei = totalePagine;
   const inizio = (paginaTornei-1) * RIGHE_PER_PAGINA;
   const paginaCorrente = lista.slice(inizio, inizio + RIGHE_PER_PAGINA);
-  el.innerHTML = paginaCorrente.map(t=>`
+  el.innerHTML = paginaCorrente.map(t=>{
+    let podioHtml = '';
+    if(t.posizioni){
+      const podio = Object.entries(t.posizioni)
+        .map(([gid,pos])=>({nome:(GIOCATORI[gid]||{}).nome || '—', pos}))
+        .sort((a,b)=>a.pos-b.pos).slice(0,3);
+      if(podio.length){
+        const medaglie = ['🥇','🥈','🥉'];
+        podioHtml = `<div class="podio">${podio.map((p,i)=>`${medaglie[i]||'•'} <b>${p.nome}</b>`).join(' &nbsp;·&nbsp; ')}</div>`;
+      }
+    }
+    return `
     <div class="torneoItem">
       <div class="nome">${t.nome}</div>
       <div class="data">${t.data ? new Date(t.data).toLocaleDateString('it-IT') : '—'}</div>
-    </div>`).join('');
+      ${podioHtml}
+    </div>`;
+  }).join('');
   aggiornaPagerTornei(paginaTornei, totalePagine);
 }
 function aggiornaPagerTornei(pag, totale){
@@ -573,7 +632,8 @@ async function controllaPrimoAvvio(){
       if(pass && pass.length>=4){
         const hash = await sha256(pass);
         await update(ref(db,'config'), {
-          eloIniziale:1000, kNormale:32, kAmichevole:20, kFinale:40, kFinale3:35,
+          eloIniziale:1000, kNormale:32, kAmichevole:20, kFinale:40, kFinale3:35, kEliminazione:36,
+          moltPrimeCinque:2, moltSeiDieci:1.5,
           fasce:FASCE, adminPassHash: hash
         });
         mostraToast('Password amministratore impostata. Ora puoi accedere dalla tab Admin.');
@@ -620,6 +680,9 @@ function renderAdminPannello(){
   document.getElementById('cfgKAmichevole').value = CONFIG.kAmichevole;
   document.getElementById('cfgKFinale').value = CONFIG.kFinale;
   document.getElementById('cfgKFinale3').value = CONFIG.kFinale3;
+  document.getElementById('cfgKEliminazione').value = CONFIG.kEliminazione;
+  document.getElementById('cfgMoltPrimeCinque').value = CONFIG.moltPrimeCinque;
+  document.getElementById('cfgMoltSeiDieci').value = CONFIG.moltSeiDieci;
   document.getElementById('cfgChiSiamo').value = CONFIG.chiSiamoTesto || '';
   document.getElementById('cfgRegolamentoUrl').value = CONFIG.regolamentoUrl || '';
   document.getElementById('cfgContattiEmail').value = CONFIG.contattiEmail || '';
@@ -639,8 +702,11 @@ function renderGiocatoriAdmin(){
   if(!lista.length){ el.innerHTML = '<span class="muted">Nessun giocatore ancora.</span>'; return; }
   el.innerHTML = lista.map(g=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap;">
-      <span>${g.nome} — ${Math.round(g.elo||0)} pt</span>
-      <span><button class="btn-ghost" onclick="eliminaGiocatore('${g.id}')">🗑 Elimina</button></span>
+      <span>${g.nome} — ${Math.round(g.elo||0)} pt <span class="muted" style="font-size:10.5px;">(${g.pg||0} partite)</span></span>
+      <span>
+        <button class="btn-ghost" onclick="apriModificaGiocatore('${g.id}')">✏️ Modifica</button>
+        <button class="btn-ghost" onclick="eliminaGiocatore('${g.id}')">🗑 Elimina</button>
+      </span>
     </div>`).join('');
 }
 window.aggiungiGiocatore = async function(){
@@ -655,6 +721,30 @@ window.eliminaGiocatore = async function(id){
   await remove(ref(db,'giocatori/'+id));
   mostraToast('Giocatore eliminato.');
 }
+window.apriModificaGiocatore = function(id){
+  const g = GIOCATORI[id];
+  if(!g) return;
+  apriModal('Modifica giocatore', `
+    <label>Nome</label>
+    <input type="text" id="editGNome" value="${g.nome}">
+    <label>Elo (correzione manuale, usare con cautela)</label>
+    <input type="number" id="editGElo" value="${Math.round(g.elo||0)}" step="1">
+    <div class="muted" style="font-size:10.5px;margin-top:6px;">
+      Modificare l'Elo qui non tocca le partite già registrate: è solo una correzione manuale che si applica da adesso in poi.
+    </div>
+    <button class="btn-blu" style="width:100%;margin-top:14px;" onclick="salvaModificaGiocatore('${id}')">Salva</button>
+  `);
+}
+window.salvaModificaGiocatore = async function(id){
+  const nome = document.getElementById('editGNome').value.trim();
+  const elo = parseFloat(document.getElementById('editGElo').value);
+  if(!nome){ mostraToast('Il nome non può essere vuoto.'); return; }
+  const dati = { nome };
+  if(!isNaN(elo)) dati.elo = elo;
+  await update(ref(db,'giocatori/'+id), dati);
+  chiudiModal();
+  mostraToast('Giocatore aggiornato.');
+}
 /* =====================================================================
    ADMIN: TORNEI
    ===================================================================== */
@@ -667,11 +757,17 @@ function renderTorneiAdmin(){
   const el = document.getElementById('listaTorneiAdmin');
   const lista = Object.keys(TORNEI).map(id=>({id,...TORNEI[id]})).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
   if(!lista.length){ el.innerHTML = '<span class="muted">Nessun torneo ancora.</span>'; return; }
-  el.innerHTML = lista.map(t=>`
+  el.innerHTML = lista.map(t=>{
+    const nPartecipanti = t.posizioni ? Object.keys(t.posizioni).length : 0;
+    return `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap;">
-      <span>${t.nome} <span class="muted">${t.data?new Date(t.data).toLocaleDateString('it-IT'):''}</span></span>
-      <button class="btn-ghost" onclick="eliminaTorneo('${t.id}')">🗑 Elimina</button>
-    </div>`).join('');
+      <span>${t.nome} <span class="muted">${t.data?new Date(t.data).toLocaleDateString('it-IT'):''}${nPartecipanti?` · ${nPartecipanti} in classifica`:''}</span></span>
+      <span>
+        <button class="btn-ghost" onclick="apriModificaTorneo('${t.id}')">✏️ Modifica</button>
+        <button class="btn-ghost" onclick="eliminaTorneo('${t.id}')">🗑 Elimina</button>
+      </span>
+    </div>`;
+  }).join('');
 }
 window.aggiungiTorneo = async function(){
   const nome = document.getElementById('nuovoTorneoNome').value.trim();
@@ -685,6 +781,41 @@ window.eliminaTorneo = async function(id){
   if(!confirm('Eliminare questo torneo?')) return;
   await remove(ref(db,'tornei/'+id));
   mostraToast('Torneo eliminato.');
+}
+window.apriModificaTorneo = function(id){
+  const t = TORNEI[id];
+  if(!t) return;
+  const posizioniAttuali = t.posizioni || {};
+  const listaGiocatori = Object.keys(GIOCATORI).map(gid=>({gid, ...GIOCATORI[gid]})).sort((a,b)=>a.nome.localeCompare(b.nome));
+  const righeGiocatori = listaGiocatori.map(g=>`
+    <span>${g.nome}</span>
+    <input type="number" min="1" step="1" id="posG_${g.gid}" placeholder="—" value="${posizioniAttuali[g.gid] ?? ''}">
+  `).join('');
+  apriModal('Modifica torneo', `
+    <label>Nome</label>
+    <input type="text" id="editTNome" value="${t.nome}">
+    <label>Data</label>
+    <input type="date" id="editTData" value="${t.data||''}">
+    <label style="margin-top:14px;">Posizione finale dei partecipanti</label>
+    <div class="muted" style="font-size:10.5px;">Inserisci la posizione (1, 2, 3...) solo per chi ha partecipato a questo torneo. Lascia vuoto chi non ha partecipato.</div>
+    <div class="posizioniList">${righeGiocatori || '<span class="muted">Nessun giocatore disponibile.</span>'}</div>
+    <button class="btn-blu" style="width:100%;margin-top:14px;" onclick="salvaModificaTorneo('${id}')">Salva</button>
+  `);
+}
+window.salvaModificaTorneo = async function(id){
+  const nome = document.getElementById('editTNome').value.trim();
+  const data = document.getElementById('editTData').value;
+  if(!nome){ mostraToast('Il nome non può essere vuoto.'); return; }
+  const posizioni = {};
+  Object.keys(GIOCATORI).forEach(gid=>{
+    const el = document.getElementById('posG_'+gid);
+    if(!el) return;
+    const val = parseInt(el.value);
+    if(!isNaN(val) && val>0) posizioni[gid] = val;
+  });
+  await update(ref(db,'tornei/'+id), { nome, data: data||null, posizioni });
+  chiudiModal();
+  mostraToast('Torneo aggiornato.');
 }
 /* =====================================================================
    REGISTRA PARTITA + CALCOLO AUTOMATICO ELO
@@ -709,12 +840,20 @@ window.registraPartita = async function(){
   const attesoB = 1 - attesoA;
   const risA = golA>golB ? 1 : (golA<golB ? 0 : 0.5);
   const risB = 1 - risA;
-  const K = kPerTipo(tipoPartita);
-  const nuovoEloA = eloA + K*(risA-attesoA);
-  const nuovoEloB = eloB + K*(risB-attesoB);
+  const kBase = kPerTipo(tipoPartita);
+  /* Moltiplicatore individuale: dipende da quante partite ha già giocato
+     QUEL giocatore (gA.pg / gB.pg), quindi A e B possono avere un K
+     effettivo diverso nella stessa partita. */
+  const moltA = moltiplicatorePerEsperienza(gA.pg||0);
+  const moltB = moltiplicatorePerEsperienza(gB.pg||0);
+  const kEffettivoA = kBase * moltA;
+  const kEffettivoB = kBase * moltB;
+  const nuovoEloA = eloA + kEffettivoA*(risA-attesoA);
+  const nuovoEloB = eloB + kEffettivoB*(risB-attesoB);
   await push(ref(db,'partite'), {
     giocatoreA:idA, giocatoreB:idB, golA, golB, torneoId,
-    tipo: tipoPartita, kUsato: K,
+    tipo: tipoPartita, kBase,
+    kUsatoA: kEffettivoA, kUsatoB: kEffettivoB, moltA, moltB,
     eloA_prima:eloA, eloB_prima:eloB, eloA_dopo:nuovoEloA, eloB_dopo:nuovoEloB,
     timestamp: Date.now()
   });
@@ -729,18 +868,29 @@ window.registraPartita = async function(){
   document.getElementById('mGolA').value=0; document.getElementById('mGolB').value=0;
   document.getElementById('mTipo').value='normale';
   aggiornaPreviewK();
-  mostraToast(`Partita registrata (${TIPI_PARTITA[tipoPartita].label}, K=${K}), Elo aggiornato automaticamente.`);
+  mostraToast(`Partita registrata (${TIPI_PARTITA[tipoPartita].label}). K usato: ${gA.nome}=${Math.round(kEffettivoA*10)/10}${moltA>1?` (x${moltA})`:''}, ${gB.nome}=${Math.round(kEffettivoB*10)/10}${moltB>1?` (x${moltB})`:''}.`);
 }
-/* mostra un piccolo promemoria del K che verrà usato in base al tipo selezionato */
+/* mostra un piccolo promemoria del K base e degli eventuali moltiplicatori dei due giocatori selezionati */
 function aggiornaPreviewK(){
-  const sel = document.getElementById('mTipo');
+  const selTipo = document.getElementById('mTipo');
   const prev = document.getElementById('mTipoKPreview');
-  if(!sel || !prev) return;
-  prev.textContent = `K che verrà usato: ${kPerTipo(sel.value)}`;
+  if(!selTipo || !prev) return;
+  const kBase = kPerTipo(selTipo.value);
+  const idA = document.getElementById('mA')?.value;
+  const idB = document.getElementById('mB')?.value;
+  const gA = GIOCATORI[idA], gB = GIOCATORI[idB];
+  let testo = `K base: ${kBase}`;
+  if(gA){ const m = moltiplicatorePerEsperienza(gA.pg||0); testo += ` · ${gA.nome}: ${Math.round(kBase*m*10)/10}${m>1?` (x${m}, ${gA.pg||0}ª+1 partita)`:''}`; }
+  if(gB){ const m = moltiplicatorePerEsperienza(gB.pg||0); testo += ` · ${gB.nome}: ${Math.round(kBase*m*10)/10}${m>1?` (x${m}, ${gB.pg||0}ª+1 partita)`:''}`; }
+  prev.textContent = testo;
 }
 document.addEventListener('DOMContentLoaded', ()=>{
-  const sel = document.getElementById('mTipo');
-  if(sel) sel.addEventListener('change', aggiornaPreviewK);
+  const selTipo = document.getElementById('mTipo');
+  const selA = document.getElementById('mA');
+  const selB = document.getElementById('mB');
+  if(selTipo) selTipo.addEventListener('change', aggiornaPreviewK);
+  if(selA) selA.addEventListener('change', aggiornaPreviewK);
+  if(selB) selB.addEventListener('change', aggiornaPreviewK);
 });
 /* =====================================================================
    ADMIN: CONTENUTI PAGINA PUBBLICA (chi siamo, regolamento, contatti)
@@ -761,7 +911,10 @@ window.salvaConfig = async function(){
   const kAmichevole = parseFloat(document.getElementById('cfgKAmichevole').value) || 20;
   const kFinale = parseFloat(document.getElementById('cfgKFinale').value) || 40;
   const kFinale3 = parseFloat(document.getElementById('cfgKFinale3').value) || 35;
-  await update(ref(db,'config'), { eloIniziale, kNormale, kAmichevole, kFinale, kFinale3 });
+  const kEliminazione = parseFloat(document.getElementById('cfgKEliminazione').value) || 36;
+  const moltPrimeCinque = parseFloat(document.getElementById('cfgMoltPrimeCinque').value) || 1;
+  const moltSeiDieci = parseFloat(document.getElementById('cfgMoltSeiDieci').value) || 1;
+  await update(ref(db,'config'), { eloIniziale, kNormale, kAmichevole, kFinale, kFinale3, kEliminazione, moltPrimeCinque, moltSeiDieci });
   mostraToast('Impostazioni salvate. Valide solo per le prossime partite.');
 }
 function renderAdminFasce(){
