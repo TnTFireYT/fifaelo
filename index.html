@@ -921,9 +921,10 @@ function renderAdminFasce(){
   const el = document.getElementById('listaFasce');
   if(!el) return;
   el.innerHTML = FASCE.map((f,i)=>`
-    <div class="row2" style="margin-top:6px;align-items:center;">
+    <div class="fasciaRow" style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;margin-top:6px;">
       <input type="number" value="${f.soglia}" onchange="modificaFascia(${i},'soglia',this.value)" placeholder="Soglia Elo">
       <input type="text" value="${f.nome}" onchange="modificaFascia(${i},'nome',this.value)" placeholder="Nome fascia">
+      <button class="btn-ghost" style="padding:9px 11px;" onclick="rimuoviFascia(${i})" title="Elimina fascia">🗑</button>
     </div>`).join('');
 }
 window.modificaFascia = function(i, campo, valore){
@@ -931,6 +932,11 @@ window.modificaFascia = function(i, campo, valore){
 }
 window.aggiungiFasciaVuota = function(){
   FASCE.push({soglia:0, nome:'Nuova fascia', colore:'#7d9dff'});
+  renderAdminFasce();
+}
+window.rimuoviFascia = function(i){
+  if(!confirm(`Eliminare la fascia "${FASCE[i].nome}"? Ricordati di premere "Salva fasce" per rendere definitiva la modifica.`)) return;
+  FASCE.splice(i,1);
   renderAdminFasce();
 }
 window.salvaFasce = async function(){
