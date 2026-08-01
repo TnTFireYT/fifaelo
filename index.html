@@ -64,6 +64,10 @@
   .rankNum{color:var(--oro);font-weight:700;width:22px;display:inline-block;}
   .avatar-sm{width:26px;height:26px;border-radius:50%;object-fit:cover;background:#0b1019;border:1px solid var(--border);vertical-align:middle;margin-right:8px;}
   .tier-badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;}
+  .stelleRating{color:var(--oro);letter-spacing:1px;font-size:13px;white-space:nowrap;}
+  .confermaBox{background:#0b1019;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12.5px;line-height:1.7;}
+  .confermaBox b{color:var(--oro);}
+  .tabellaRiga{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;margin-top:6px;}
   .feed div{border-bottom:1px dashed var(--border);padding:9px 0;font-size:12px;color:#c7cede;}
   .feed div b{color:var(--text);}
   .feed .esito-V{color:var(--verde);font-weight:700;}
@@ -164,7 +168,7 @@
       <div class="panel col-classifica">
         <h2>Classifica Elo</h2>
         <table>
-          <thead><tr><th>#</th><th>Giocatore</th><th>Fascia</th><th>Elo</th><th>PG</th><th>V-P-S</th></tr></thead>
+          <thead><tr><th>#</th><th>Giocatore</th><th>Fascia</th><th>Stelle</th><th>Elo</th><th>PG</th><th>V-P-S</th></tr></thead>
           <tbody id="classificaBody"><tr><td colspan="6" class="muted">Caricamento...</td></tr></tbody>
         </table>
       </div>
@@ -215,6 +219,17 @@
         </select>
         <div class="muted" id="mTipoKPreview" style="font-size:10.5px;margin-top:6px;"></div>
         <button class="btn-verde" style="width:100%;margin-top:14px;" onclick="registraPartita()">Salva partita e aggiorna Elo</button>
+      </div>
+      <div class="panel">
+        <h2>Annulla ultime partite</h2>
+        <div class="muted" style="font-size:10.5px;margin-bottom:8px;">
+          Elimina le partite più recenti (in ordine) e riporta l'Elo, i punti giocati e il record V-P-S dei giocatori coinvolti esattamente com'erano prima di quelle partite. Operazione irreversibile.
+        </div>
+        <div class="row4" style="grid-template-columns:1fr 1fr 1fr;">
+          <button class="btn-rosso" onclick="annullaUltimePartite(1)">Annulla ultima</button>
+          <button class="btn-rosso" onclick="annullaUltimePartite(3)">Annulla ultime 3</button>
+          <button class="btn-rosso" onclick="annullaUltimePartite(5)">Annulla ultime 5</button>
+        </div>
       </div>
       <div class="panel">
         <h2>Giocatori</h2>
@@ -292,6 +307,11 @@
             <input type="number" id="cfgMoltSeiDieci" value="1.5" step="0.1" min="1">
           </div>
         </div>
+        <label style="margin-top:14px;">Divisore Elo (X)</label>
+        <div class="muted" style="font-size:10.5px;margin-bottom:8px;">
+          Sostituisce il 400 standard nella formula del risultato atteso EA = 1/(1+10^((RB-RA)/X)). Valori più bassi rendono la differenza di Elo tra i due giocatori più "decisiva" nel calcolo. Come per i K, cambiarlo influenza solo le prossime partite: quelle già salvate restano congelate con l'X usato al momento.
+        </div>
+        <input type="number" id="cfgX" value="400" step="1" min="1">
         <button class="btn-blu" style="width:100%;margin-top:12px;" onclick="salvaConfig()">Salva impostazioni</button>
 
         <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
@@ -299,6 +319,34 @@
           <div id="listaFasce"></div>
           <button class="btn-ghost" style="margin-top:8px;" onclick="aggiungiFasciaVuota()">+ aggiungi fascia</button>
           <button class="btn-oro" style="width:100%;margin-top:10px;" onclick="salvaFasce()">Salva fasce</button>
+        </div>
+
+        <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+          <label style="margin-top:0;">Stelle (soglia minima di Elo → numero di stelle, anche a metà es. 2.5)</label>
+          <div id="listaStelleSoglie"></div>
+          <button class="btn-ghost" style="margin-top:8px;" onclick="aggiungiRigaStelle()">+ aggiungi soglia</button>
+          <button class="btn-oro" style="width:100%;margin-top:10px;" onclick="salvaStelleSoglie()">Salva soglie stelle</button>
+        </div>
+
+        <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+          <label style="margin-top:0;">Tabella moltiplicatore G (differenza gol nel risultato)</label>
+          <div class="muted" style="font-size:10.5px;margin-bottom:8px;">
+            Per una differenza di gol superiore all'ultima soglia inserita, il valore continua a crescere in automatico secondo la pendenza qui sotto (es. soglia 4 → 1.30, pendenza 0.125: a 5 gol di scarto G=1.425).
+          </div>
+          <div id="listaTabellaG"></div>
+          <button class="btn-ghost" style="margin-top:8px;" onclick="aggiungiRigaG()">+ aggiungi soglia</button>
+          <label style="margin-top:10px;">Pendenza oltre l'ultima soglia (per gol in più)</label>
+          <input type="number" id="cfgPendenzaG" value="0.125" step="0.005">
+          <button class="btn-oro" style="width:100%;margin-top:10px;" onclick="salvaTabellaG()">Salva tabella G</button>
+        </div>
+
+        <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+          <label style="margin-top:0;">Bonus/malus S (differenza stelle tra i due giocatori)</label>
+          <div class="muted" style="font-size:10.5px;margin-bottom:8px;">
+            Non dipende dal risultato letterale ma da quanto uno ha fatto meglio/peggio dell'atteso. Per ogni mezza stella di differenza vale questa percentuale, tranne la prima mezza stella da sola (0.5 stelle di scarto → nessun bonus/malus); da 1 stella intera in su la prima mezza torna a contare (es. con 5%: 1 stella → 10%, 1.5 → 15%, 2 → 20%). Lo sfavorito (meno stelle): bonus se fa meglio dell'atteso, malus speculare (perde meno) se fa peggio. Il favorito: l'opposto (guadagna meno se vince come previsto, perde di più se perde a sorpresa).
+          </div>
+          <input type="number" id="cfgPercStellaMezza" value="0.05" step="0.005" min="0">
+          <button class="btn-oro" style="width:100%;margin-top:10px;" onclick="salvaPercStella()">Salva percentuale S</button>
         </div>
         <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
           <label style="margin-top:0;">Cambia la password amministratore</label>
@@ -354,8 +402,26 @@ let CONFIG = {
   eloIniziale:1000,
   kNormale:32, kAmichevole:20, kFinale:40, kFinale3:35, kEliminazione:36,
   moltPrimeCinque:2, moltSeiDieci:1.5,
+  x:400, pendenzaG:0.125, percStellaMezza:0.05,
   chiSiamoTesto:'', regolamentoUrl:'', contattiEmail:''
 };
+/* Tabella moltiplicatore G in base alla differenza reti (differenza gol).
+   Sopra l'ultima soglia si estrapola con CONFIG.pendenzaG per ogni gol in più. */
+let TABELLA_G = [
+  { soglia:0, valore:1.00 }, // 0-1 gol di scarto
+  { soglia:2, valore:1.10 },
+  { soglia:3, valore:1.20 },
+  { soglia:4, valore:1.30 }
+];
+/* Soglie Elo -> numero di stelle (si possono aggiungere righe con valori
+   a metà, es. soglia:950, stelle:2.5, per avere gradazioni più fini). */
+let STELLE_SOGLIE = [
+  { soglia:0,    stelle:1 },
+  { soglia:900,  stelle:2 },
+  { soglia:1000, stelle:3 },
+  { soglia:1100, stelle:4 },
+  { soglia:1200, stelle:5 }
+];
 const TIPI_PARTITA = {
   normale:     { label:'Normale',             cssClass:'tipo-normale'     },
   amichevole:  { label:'Amichevole',          cssClass:'tipo-amichevole'  },
@@ -418,6 +484,43 @@ function fasciaDi(elo){
   for(const f of FASCE){ if(elo >= f.soglia) scelta = f; }
   return scelta;
 }
+/* ---------------- stelle, tabella G (differenza gol), tabella S (bonus sfavorito) ---------------- */
+function stelleDi(elo){
+  let scelta = STELLE_SOGLIE[0] || {stelle:1};
+  for(const s of STELLE_SOGLIE){ if(elo >= s.soglia) scelta = s; }
+  return scelta.stelle ?? 1;
+}
+function valoreTabella(diff, tabella, pendenza){
+  if(!tabella || !tabella.length) return 1;
+  const ordinata = [...tabella].sort((a,b)=>a.soglia-b.soglia);
+  let scelta = ordinata[0];
+  for(const r of ordinata){ if(diff >= r.soglia) scelta = r; }
+  const max = ordinata[ordinata.length-1];
+  if(diff > max.soglia){ return max.valore + (diff - max.soglia) * (pendenza||0); }
+  return scelta.valore;
+}
+function calcolaG(diffGol){ return valoreTabella(diffGol, TABELLA_G, CONFIG.pendenzaG); }
+/* S: 5% (configurabile) per ogni mezza stella di differenza, MA la prima
+   mezza stella non conta da sola. Quindi:
+   diff 0    -> 1.00 (nessuna differenza)
+   diff 0.5  -> 1.00 (eccezione: una sola mezza stella non dà bonus)
+   diff 1.0  -> 1.10 (da una stella intera in su, si conta come se anche
+                       la prima mezza stella fosse valida: 2 mezze x 5%)
+   diff 1.5  -> 1.15 (3 mezze x 5%)
+   diff 2.0  -> 1.20 (4 mezze x 5%), ecc. */
+function calcolaS(diffStelle){
+  const perc = CONFIG.percStellaMezza ?? 0.05;
+  if(Math.abs(diffStelle - 0.5) < 1e-9) return 1; // eccezione: sola mezza stella
+  return 1 + diffStelle * (perc*2);
+}
+function renderStelleHtml(n){
+  n = Math.max(0, Math.min(5, n||0));
+  const pieno = Math.floor(n+1e-9);
+  const mezza = (n - pieno) >= 0.5-1e-9;
+  const vuote = Math.max(0, 5 - pieno - (mezza?1:0));
+  const testoMezza = mezza ? '<small>½</small>' : '';
+  return `<span class="stelleRating" title="${n} stelle">${'★'.repeat(pieno)}${testoMezza}${'☆'.repeat(vuote)}</span>`;
+}
 function matchRicerca(testo){
   if(!ricercaQuery) return true;
   return (testo||'').toLowerCase().includes(ricercaQuery.toLowerCase());
@@ -440,13 +543,18 @@ function attaccaListeners(){
         kEliminazione: v.kEliminazione ?? 36,
         moltPrimeCinque: v.moltPrimeCinque ?? 2,
         moltSeiDieci: v.moltSeiDieci ?? 1.5,
+        x: v.x ?? 400,
+        pendenzaG: v.pendenzaG ?? 0.125,
+        percStellaMezza: v.percStellaMezza ?? 0.05,
         chiSiamoTesto: v.chiSiamoTesto || '',
         regolamentoUrl: v.regolamentoUrl || '',
         contattiEmail: v.contattiEmail || ''
       };
     }
     if(v && v.fasce) FASCE = v.fasce;
-    renderClassifica(); renderAdminFasce(); aggiornaPreviewK();
+    if(v && v.tabellaG) TABELLA_G = v.tabellaG;
+    if(v && v.stelleSoglie) STELLE_SOGLIE = v.stelleSoglie;
+    renderClassifica(); renderAdminFasce(); renderAdminTabellaG(); renderAdminStelleSoglie(); aggiornaPreviewK();
   });
   onValue(ref(db,'giocatori'), snap=>{
     GIOCATORI = snap.val() || {};
@@ -478,11 +586,11 @@ window.vaiTabAdmin = function(){ cambiaTab('admin'); document.querySelector('[da
 function renderClassifica(){
   const body = document.getElementById('classificaBody');
   let lista = Object.keys(GIOCATORI).map(id=>({id, ...GIOCATORI[id]}));
-  if(!lista.length){ body.innerHTML = '<tr><td colspan="6" class="muted">Nessun giocatore ancora.</td></tr>'; return; }
+  if(!lista.length){ body.innerHTML = '<tr><td colspan="7" class="muted">Nessun giocatore ancora.</td></tr>'; return; }
   lista.sort((a,b)=>(b.elo||0)-(a.elo||0));
   const listaCompleta = lista; // usata per mantenere la posizione # anche filtrando
   lista = lista.filter(g=>matchRicerca(g.nome));
-  if(!lista.length){ body.innerHTML = '<tr><td colspan="6" class="muted">Nessun giocatore corrisponde alla ricerca.</td></tr>'; return; }
+  if(!lista.length){ body.innerHTML = '<tr><td colspan="7" class="muted">Nessun giocatore corrisponde alla ricerca.</td></tr>'; return; }
   body.innerHTML = lista.map(g=>{
     const i = listaCompleta.findIndex(x=>x.id===g.id);
     const f = fasciaDi(g.elo||0);
@@ -492,6 +600,7 @@ function renderClassifica(){
       <td><span class="rankNum">${i+1}</span></td>
       <td>${g.avatarUrl?`<img class="avatar-sm" src="${g.avatarUrl}">`:''}${g.nome}</td>
       <td><span class="tier-badge" style="background:${f.colore}33;color:${f.colore};">${f.nome}</span></td>
+      <td>${renderStelleHtml(stelleDi(g.elo||0))}</td>
       <td><b>${Math.round(g.elo||0)}</b>${deltaHtml}</td>
       <td>${g.pg||0}</td>
       <td>${g.v||0}-${g.p||0}-${g.s||0}</td>
@@ -527,6 +636,7 @@ function renderPartite(){
     const kDettaglio = (p.kUsatoA!=null || p.kUsatoB!=null)
       ? `<span class="muted" style="font-size:10.5px;">K: ${nomeA} ${Math.round((p.kUsatoA??p.kUsato??0)*10)/10}${p.moltA>1?` (x${p.moltA})`:''} · ${nomeB} ${Math.round((p.kUsatoB??p.kUsato??0)*10)/10}${p.moltB>1?` (x${p.moltB})`:''}</span>`
       : (p.kUsato ? `<span class="muted" style="font-size:10.5px;">K${p.kUsato}</span>` : '');
+    const gsDettaglio = (p.gUsato!=null) ? `<span class="muted" style="font-size:10.5px;"> · G${Math.round(p.gUsato*100)/100}${(p.sUsatoA>1||p.sUsatoB>1)?` · S: ${nomeA} ${Math.round((p.sUsatoA??1)*100)/100} · ${nomeB} ${Math.round((p.sUsatoB??1)*100)/100}`:''}${p.xUsato?` · X${p.xUsato}`:''}</span>` : '';
     return `<div>
       <div class="cardScore">
         <span><b>${nomeA}</b> <span class="matchScore">${p.golA} - ${p.golB}</span> <b>${nomeB}</b>${tipoBadge}</span>
@@ -536,7 +646,7 @@ function renderPartite(){
         ${nomeA}: <span class="${dA>0?'up':(dA<0?'down':'flat')}">${dA>=0?'+':''}${dA}</span> (${Math.round(p.eloA_prima)}→${Math.round(p.eloA_dopo)}) &nbsp;·&nbsp;
         ${nomeB}: <span class="${dB>0?'up':(dB<0?'down':'flat')}">${dB>=0?'+':''}${dB}</span> (${Math.round(p.eloB_prima)}→${Math.round(p.eloB_dopo)})
       </div>
-      <div style="margin-top:2px;">${kDettaglio}</div>
+      <div style="margin-top:2px;">${kDettaglio}${gsDettaglio}</div>
     </div>`;
   }).join('');
   aggiornaPagerPartite(paginaPartite, totalePagine);
@@ -633,8 +743,8 @@ async function controllaPrimoAvvio(){
         const hash = await sha256(pass);
         await update(ref(db,'config'), {
           eloIniziale:1000, kNormale:32, kAmichevole:20, kFinale:40, kFinale3:35, kEliminazione:36,
-          moltPrimeCinque:2, moltSeiDieci:1.5,
-          fasce:FASCE, adminPassHash: hash
+          moltPrimeCinque:2, moltSeiDieci:1.5, x:400, pendenzaG:0.125, percStellaMezza:0.05,
+          fasce:FASCE, tabellaG:TABELLA_G, stelleSoglie:STELLE_SOGLIE, adminPassHash: hash
         });
         mostraToast('Password amministratore impostata. Ora puoi accedere dalla tab Admin.');
       }
@@ -683,10 +793,14 @@ function renderAdminPannello(){
   document.getElementById('cfgKEliminazione').value = CONFIG.kEliminazione;
   document.getElementById('cfgMoltPrimeCinque').value = CONFIG.moltPrimeCinque;
   document.getElementById('cfgMoltSeiDieci').value = CONFIG.moltSeiDieci;
+  document.getElementById('cfgX').value = CONFIG.x ?? 400;
+  document.getElementById('cfgPercStellaMezza').value = CONFIG.percStellaMezza ?? 0.05;
   document.getElementById('cfgChiSiamo').value = CONFIG.chiSiamoTesto || '';
   document.getElementById('cfgRegolamentoUrl').value = CONFIG.regolamentoUrl || '';
   document.getElementById('cfgContattiEmail').value = CONFIG.contattiEmail || '';
   renderAdminFasce();
+  renderAdminTabellaG();
+  renderAdminStelleSoglie();
   aggiornaPreviewK();
 }
 /* =====================================================================
@@ -825,7 +939,51 @@ window.salvaModificaTorneo = async function(id){
    Finale 3° posto) e viene salvato con la partita stessa: se in futuro
    cambi i K nelle Impostazioni, questa partita NON viene ricalcolata.
    ===================================================================== */
-window.registraPartita = async function(){
+/* Calcola tutti i valori di una partita SENZA scrivere nulla su Firebase:
+   usata sia per l'anteprima di conferma sia, alla conferma, per il salvataggio vero. */
+function calcolaPartita(idA, idB, golA, golB, tipoPartita){
+  const gA = GIOCATORI[idA], gB = GIOCATORI[idB];
+  const eloA = gA.elo||CONFIG.eloIniziale, eloB = gB.elo||CONFIG.eloIniziale;
+  const x = CONFIG.x || 400;
+  const attesoA = 1/(1+Math.pow(10,(eloB-eloA)/x));
+  const attesoB = 1 - attesoA;
+  const risA = golA>golB ? 1 : (golA<golB ? 0 : 0.5);
+  const risB = 1 - risA;
+  const kBase = kPerTipo(tipoPartita);
+  const moltA = moltiplicatorePerEsperienza(gA.pg||0);
+  const moltB = moltiplicatorePerEsperienza(gB.pg||0);
+  const diffGol = Math.abs(golA-golB);
+  const G = calcolaG(diffGol);
+  const stelleA = stelleDi(eloA), stelleB = stelleDi(eloB);
+  const diffStelle = Math.abs(stelleA-stelleB);
+  /* S dipende dal SEGNO della prestazione rispetto all'atteso (non dal
+     risultato letterale V/P/S): lo sfavorito, se fa meglio dell'atteso
+     (vince/pareggia bene), prende il bonus; se fa peggio (perde), prende
+     lo specchio come MALUS, quindi perde meno Elo del solito. Il favorito
+     è l'esatto opposto: se fa come previsto (vince) prende il malus e
+     guadagna meno; se fa peggio del previsto (perde a sorpresa) prende il
+     bonus e perde più Elo del solito. */
+  const valoreS = calcolaS(diffStelle); // bonus, es. 1.15
+  const malusS = 2 - valoreS;           // specchio, es. 0.85
+  let sA = 1, sB = 1;
+  if(stelleA !== stelleB){
+    const AeSfavorito = stelleA < stelleB;
+    const segnoA = (risA - attesoA) >= 0; // A ha fatto meglio (o uguale) dell'atteso
+    const segnoB = (risB - attesoB) >= 0;
+    sA = AeSfavorito ? (segnoA ? valoreS : malusS) : (segnoA ? malusS : valoreS);
+    sB = AeSfavorito ? (segnoB ? malusS : valoreS) : (segnoB ? valoreS : malusS);
+  }
+  const kEffettivoA = kBase * moltA * G * sA;
+  const kEffettivoB = kBase * moltB * G * sB;
+  const nuovoEloA = eloA + kEffettivoA*(risA-attesoA);
+  const nuovoEloB = eloB + kEffettivoB*(risB-attesoB);
+  return {
+    idA, idB, golA, golB, tipoPartita, gA, gB, eloA, eloB, x, risA, risB, kBase,
+    moltA, moltB, diffGol, G, stelleA, stelleB, diffStelle, sA, sB,
+    kEffettivoA, kEffettivoB, nuovoEloA, nuovoEloB
+  };
+}
+window.registraPartita = function(){
   const idA = document.getElementById('mA').value;
   const idB = document.getElementById('mB').value;
   const golA = parseInt(document.getElementById('mGolA').value);
@@ -834,41 +992,131 @@ window.registraPartita = async function(){
   const tipoPartita = document.getElementById('mTipo').value || 'normale';
   if(!idA || !idB || idA===idB){ mostraToast('Seleziona due giocatori diversi.'); return; }
   if(isNaN(golA) || isNaN(golB) || golA<0 || golB<0){ mostraToast('Punteggio non valido.'); return; }
-  const gA = GIOCATORI[idA], gB = GIOCATORI[idB];
-  const eloA = gA.elo||CONFIG.eloIniziale, eloB = gB.elo||CONFIG.eloIniziale;
-  const attesoA = 1/(1+Math.pow(10,(eloB-eloA)/400));
-  const attesoB = 1 - attesoA;
-  const risA = golA>golB ? 1 : (golA<golB ? 0 : 0.5);
-  const risB = 1 - risA;
-  const kBase = kPerTipo(tipoPartita);
-  /* Moltiplicatore individuale: dipende da quante partite ha già giocato
-     QUEL giocatore (gA.pg / gB.pg), quindi A e B possono avere un K
-     effettivo diverso nella stessa partita. */
-  const moltA = moltiplicatorePerEsperienza(gA.pg||0);
-  const moltB = moltiplicatorePerEsperienza(gB.pg||0);
-  const kEffettivoA = kBase * moltA;
-  const kEffettivoB = kBase * moltB;
-  const nuovoEloA = eloA + kEffettivoA*(risA-attesoA);
-  const nuovoEloB = eloB + kEffettivoB*(risB-attesoB);
+  const c = calcolaPartita(idA, idB, golA, golB, tipoPartita);
+  const html = `
+    <div class="confermaBox">
+      <div><b>${c.gA.nome}</b> ${golA} - ${golB} <b>${c.gB.nome}</b> ${renderStelleHtml(c.stelleA)} vs ${renderStelleHtml(c.stelleB)}</div>
+      <div style="margin-top:8px;">${c.gA.nome}: ${Math.round(c.eloA)} → <b>${Math.round(c.nuovoEloA)}</b> (${c.nuovoEloA-c.eloA>=0?'+':''}${Math.round(c.nuovoEloA-c.eloA)})</div>
+      <div>${c.gB.nome}: ${Math.round(c.eloB)} → <b>${Math.round(c.nuovoEloB)}</b> (${c.nuovoEloB-c.eloB>=0?'+':''}${Math.round(c.nuovoEloB-c.eloB)})</div>
+      <div class="muted" style="margin-top:8px;font-size:11px;">
+        K base ${c.kBase} · G(diff. gol ${c.diffGol}) ${Math.round(c.G*100)/100} · X ${c.x}<br>
+        ${c.gA.nome}: espon. x${c.moltA} · S x${Math.round(c.sA*100)/100} → K eff. ${Math.round(c.kEffettivoA*10)/10}<br>
+        ${c.gB.nome}: espon. x${c.moltB} · S x${Math.round(c.sB*100)/100} → K eff. ${Math.round(c.kEffettivoB*10)/10}
+      </div>
+    </div>
+    <button class="btn-verde" id="btnConfermaPartita" style="width:100%;margin-top:14px;" disabled>Conferma registrazione (attendi 5s...)</button>
+  `;
+  apriModal('Conferma partita', html);
+  const btn = document.getElementById('btnConfermaPartita');
+  let secondi = 5;
+  const iv = setInterval(()=>{
+    secondi--;
+    if(secondi<=0){
+      clearInterval(iv);
+      btn.disabled = false;
+      btn.textContent = 'Conferma registrazione';
+    } else {
+      btn.textContent = `Conferma registrazione (attendi ${secondi}s...)`;
+    }
+  }, 1000);
+  btn.onclick = async function(){
+    if(btn.disabled) return;
+    btn.disabled = true; btn.textContent = 'Salvataggio...';
+    await confermaRegistraPartita(c, torneoId);
+  };
+}
+async function confermaRegistraPartita(c, torneoId){
   await push(ref(db,'partite'), {
-    giocatoreA:idA, giocatoreB:idB, golA, golB, torneoId,
-    tipo: tipoPartita, kBase,
-    kUsatoA: kEffettivoA, kUsatoB: kEffettivoB, moltA, moltB,
-    eloA_prima:eloA, eloB_prima:eloB, eloA_dopo:nuovoEloA, eloB_dopo:nuovoEloB,
+    giocatoreA:c.idA, giocatoreB:c.idB, golA:c.golA, golB:c.golB, torneoId,
+    tipo: c.tipoPartita, kBase:c.kBase,
+    kUsatoA: c.kEffettivoA, kUsatoB: c.kEffettivoB, moltA:c.moltA, moltB:c.moltB,
+    diffGol:c.diffGol, gUsato:c.G, xUsato:c.x,
+    stelleA_prima:c.stelleA, stelleB_prima:c.stelleB, diffStelle:c.diffStelle,
+    sUsatoA:c.sA, sUsatoB:c.sB,
+    eloA_prima:c.eloA, eloB_prima:c.eloB, eloA_dopo:c.nuovoEloA, eloB_dopo:c.nuovoEloB,
     timestamp: Date.now()
   });
-  await update(ref(db,'giocatori/'+idA), {
-    elo: nuovoEloA, pg:(gA.pg||0)+1, v:(gA.v||0)+(risA===1?1:0), p:(gA.p||0)+(risA===0.5?1:0), s:(gA.s||0)+(risA===0?1:0),
-    ultimoDelta: Math.round(nuovoEloA-eloA)
+  await update(ref(db,'giocatori/'+c.idA), {
+    elo: c.nuovoEloA, pg:(c.gA.pg||0)+1, v:(c.gA.v||0)+(c.risA===1?1:0), p:(c.gA.p||0)+(c.risA===0.5?1:0), s:(c.gA.s||0)+(c.risA===0?1:0),
+    ultimoDelta: Math.round(c.nuovoEloA-c.eloA)
   });
-  await update(ref(db,'giocatori/'+idB), {
-    elo: nuovoEloB, pg:(gB.pg||0)+1, v:(gB.v||0)+(risB===1?1:0), p:(gB.p||0)+(risB===0.5?1:0), s:(gB.s||0)+(risB===0?1:0),
-    ultimoDelta: Math.round(nuovoEloB-eloB)
+  await update(ref(db,'giocatori/'+c.idB), {
+    elo: c.nuovoEloB, pg:(c.gB.pg||0)+1, v:(c.gB.v||0)+(c.risB===1?1:0), p:(c.gB.p||0)+(c.risB===0.5?1:0), s:(c.gB.s||0)+(c.risB===0?1:0),
+    ultimoDelta: Math.round(c.nuovoEloB-c.eloB)
   });
   document.getElementById('mGolA').value=0; document.getElementById('mGolB').value=0;
   document.getElementById('mTipo').value='normale';
+  chiudiModal();
   aggiornaPreviewK();
-  mostraToast(`Partita registrata (${TIPI_PARTITA[tipoPartita].label}). K usato: ${gA.nome}=${Math.round(kEffettivoA*10)/10}${moltA>1?` (x${moltA})`:''}, ${gB.nome}=${Math.round(kEffettivoB*10)/10}${moltB>1?` (x${moltB})`:''}.`);
+  mostraToast(`Partita registrata (${TIPI_PARTITA[c.tipoPartita].label}). K eff.: ${c.gA.nome}=${Math.round(c.kEffettivoA*10)/10}, ${c.gB.nome}=${Math.round(c.kEffettivoB*10)/10}.`);
+}
+/* =====================================================================
+   ANNULLA ULTIME N PARTITE (in ordine cronologico, dalla più recente)
+   Ripristina Elo/pg/v/p/s dei giocatori coinvolti esattamente com'erano
+   prima di ciascuna partita annullata, poi elimina le partite stesse.
+   Processando dalla più recente alla meno recente e IMPOSTANDO (non
+   sottraendo) i valori "prima" salvati in ciascuna partita, il ripristino
+   è corretto anche se i giocatori coinvolti hanno giocato altre partite
+   nel mezzo con altri avversari.
+   ===================================================================== */
+window.annullaUltimePartite = async function(n){
+  if(!PARTITE.length){ mostraToast('Nessuna partita da annullare.'); return; }
+  const daAnnullare = PARTITE.slice(0, Math.min(n, PARTITE.length)); // già ordinate: più recente prima
+  const elenco = daAnnullare.map(p=>{
+    const nomeA = (GIOCATORI[p.giocatoreA]||{}).nome || '—';
+    const nomeB = (GIOCATORI[p.giocatoreB]||{}).nome || '—';
+    return `${nomeA} ${p.golA}-${p.golB} ${nomeB}`;
+  }).join('\n');
+  if(!confirm(`Stai per annullare ${daAnnullare.length} partita/e (dalla più recente):\n\n${elenco}\n\nL'Elo dei giocatori coinvolti tornerà com'era prima di queste partite. Operazione irreversibile. Continuare?`)) return;
+  /* stato corrente dei giocatori coinvolti, da aggiornare in memoria man mano che si ripristina */
+  const statoGiocatori = {};
+  for(const p of daAnnullare){
+    [p.giocatoreA, p.giocatoreB].forEach(id=>{
+      if(!statoGiocatori[id]) statoGiocatori[id] = { ...(GIOCATORI[id]||{}) };
+    });
+  }
+  for(const p of daAnnullare){
+    const gA = statoGiocatori[p.giocatoreA], gB = statoGiocatori[p.giocatoreB];
+    const esitoA = esitoLettera(p.golA, p.golB), esitoB = esitoLettera(p.golB, p.golA);
+    if(gA){
+      gA.elo = p.eloA_prima;
+      gA.pg = Math.max(0, (gA.pg||0) - 1);
+      if(esitoA==='V') gA.v = Math.max(0,(gA.v||0)-1);
+      if(esitoA==='P') gA.p = Math.max(0,(gA.p||0)-1);
+      if(esitoA==='S') gA.s = Math.max(0,(gA.s||0)-1);
+    }
+    if(gB){
+      gB.elo = p.eloB_prima;
+      gB.pg = Math.max(0, (gB.pg||0) - 1);
+      if(esitoB==='V') gB.v = Math.max(0,(gB.v||0)-1);
+      if(esitoB==='P') gB.p = Math.max(0,(gB.p||0)-1);
+      if(esitoB==='S') gB.s = Math.max(0,(gB.s||0)-1);
+    }
+  }
+  /* ultimoDelta: ricalcolato guardando, tra le partite NON annullate, l'ultima
+     (più recente) che coinvolge ciascun giocatore interessato. */
+  const idAnnullati = new Set(daAnnullare.map(p=>p.id));
+  const partiteRimanenti = PARTITE.filter(p=>!idAnnullati.has(p.id));
+  Object.keys(statoGiocatori).forEach(id=>{
+    const ultima = partiteRimanenti.find(p=>p.giocatoreA===id || p.giocatoreB===id);
+    if(ultima){
+      statoGiocatori[id].ultimoDelta = ultima.giocatoreA===id
+        ? Math.round(ultima.eloA_dopo - ultima.eloA_prima)
+        : Math.round(ultima.eloB_dopo - ultima.eloB_prima);
+    } else {
+      statoGiocatori[id].ultimoDelta = 0;
+    }
+  });
+  for(const id of Object.keys(statoGiocatori)){
+    const g = statoGiocatori[id];
+    await update(ref(db,'giocatori/'+id), {
+      elo:g.elo, pg:g.pg, v:g.v, p:g.p, s:g.s, ultimoDelta:g.ultimoDelta
+    });
+  }
+  for(const p of daAnnullare){
+    await remove(ref(db,'partite/'+p.id));
+  }
+  mostraToast(`${daAnnullare.length} partita/e annullata/e ed Elo ripristinato.`);
 }
 /* mostra un piccolo promemoria del K base e degli eventuali moltiplicatori dei due giocatori selezionati */
 function aggiornaPreviewK(){
@@ -914,8 +1162,54 @@ window.salvaConfig = async function(){
   const kEliminazione = parseFloat(document.getElementById('cfgKEliminazione').value) || 36;
   const moltPrimeCinque = parseFloat(document.getElementById('cfgMoltPrimeCinque').value) || 1;
   const moltSeiDieci = parseFloat(document.getElementById('cfgMoltSeiDieci').value) || 1;
-  await update(ref(db,'config'), { eloIniziale, kNormale, kAmichevole, kFinale, kFinale3, kEliminazione, moltPrimeCinque, moltSeiDieci });
+  const x = parseFloat(document.getElementById('cfgX').value) || 400;
+  await update(ref(db,'config'), { eloIniziale, kNormale, kAmichevole, kFinale, kFinale3, kEliminazione, moltPrimeCinque, moltSeiDieci, x });
   mostraToast('Impostazioni salvate. Valide solo per le prossime partite.');
+}
+/* ---------------- editor generico soglie/stelle/G/S (usato dalle 3 tabelle sotto) ---------------- */
+function renderAdminStelleSoglie(){
+  const el = document.getElementById('listaStelleSoglie');
+  if(!el) return;
+  el.innerHTML = STELLE_SOGLIE.map((r,i)=>`
+    <div class="tabellaRiga">
+      <input type="number" step="10" value="${r.soglia}" onchange="modificaRigaStelle(${i},'soglia',this.value)" placeholder="Soglia Elo">
+      <input type="number" step="0.5" value="${r.stelle}" onchange="modificaRigaStelle(${i},'stelle',this.value)" placeholder="Stelle">
+      <button class="btn-ghost" style="padding:9px 11px;" onclick="rimuoviRigaStelle(${i})" title="Elimina soglia">🗑</button>
+    </div>`).join('');
+}
+window.modificaRigaStelle = function(i, campo, valore){ STELLE_SOGLIE[i][campo] = parseFloat(valore)||0; }
+window.aggiungiRigaStelle = function(){ STELLE_SOGLIE.push({soglia:0, stelle:1}); renderAdminStelleSoglie(); }
+window.rimuoviRigaStelle = function(i){ STELLE_SOGLIE.splice(i,1); renderAdminStelleSoglie(); }
+window.salvaStelleSoglie = async function(){
+  STELLE_SOGLIE.sort((a,b)=>a.soglia-b.soglia);
+  await update(ref(db,'config'), { stelleSoglie: STELLE_SOGLIE });
+  mostraToast('Soglie stelle salvate.');
+}
+function renderAdminTabellaG(){
+  const el = document.getElementById('listaTabellaG');
+  if(!el) return;
+  el.innerHTML = TABELLA_G.map((r,i)=>`
+    <div class="tabellaRiga">
+      <input type="number" step="1" value="${r.soglia}" onchange="modificaRigaG(${i},'soglia',this.value)" placeholder="Diff. gol">
+      <input type="number" step="0.01" value="${r.valore}" onchange="modificaRigaG(${i},'valore',this.value)" placeholder="Moltiplicatore G">
+      <button class="btn-ghost" style="padding:9px 11px;" onclick="rimuoviRigaG(${i})" title="Elimina soglia">🗑</button>
+    </div>`).join('');
+  const pend = document.getElementById('cfgPendenzaG');
+  if(pend) pend.value = CONFIG.pendenzaG ?? 0.125;
+}
+window.modificaRigaG = function(i, campo, valore){ TABELLA_G[i][campo] = parseFloat(valore)||0; }
+window.aggiungiRigaG = function(){ TABELLA_G.push({soglia:0, valore:1}); renderAdminTabellaG(); }
+window.rimuoviRigaG = function(i){ TABELLA_G.splice(i,1); renderAdminTabellaG(); }
+window.salvaTabellaG = async function(){
+  TABELLA_G.sort((a,b)=>a.soglia-b.soglia);
+  const pendenzaG = parseFloat(document.getElementById('cfgPendenzaG').value) || 0;
+  await update(ref(db,'config'), { tabellaG: TABELLA_G, pendenzaG });
+  mostraToast('Tabella G salvata.');
+}
+window.salvaPercStella = async function(){
+  const percStellaMezza = parseFloat(document.getElementById('cfgPercStellaMezza').value);
+  await update(ref(db,'config'), { percStellaMezza: isNaN(percStellaMezza)?0.05:percStellaMezza });
+  mostraToast('Percentuale S salvata.');
 }
 function renderAdminFasce(){
   const el = document.getElementById('listaFasce');
