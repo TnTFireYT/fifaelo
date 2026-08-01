@@ -209,14 +209,14 @@
         <h2>Registra una partita</h2>
         <label>Giocatore A</label><select id="mA"></select>
         <label>Stelle squadra scelta da A in questa partita</label>
-        <input type="number" id="mStelleA" min="1" max="5" step="0.5" value="3">
+        <input type="number" id="mStelleA" min="0.5" max="5" step="0.5" value="3">
         <div class="row2">
           <div><label>Gol A</label><input type="number" id="mGolA" value="0" min="0" step="1"></div>
           <div><label>Gol B</label><input type="number" id="mGolB" value="0" min="0" step="1"></div>
         </div>
         <label>Giocatore B</label><select id="mB"></select>
         <label>Stelle squadra scelta da B in questa partita</label>
-        <input type="number" id="mStelleB" min="1" max="5" step="0.5" value="3">
+        <input type="number" id="mStelleB" min="0.5" max="5" step="0.5" value="3">
         <div class="muted" style="font-size:10.5px;margin-top:2px;">Le stelle dipendono dalla squadra scelta in questa partita, non dal giocatore: vanno impostate ogni volta.</div>
         <label>Torneo (facoltativo)</label><select id="mTorneo"><option value="">— nessuno —</option></select>
         <label>Tipo partita (determina il K usato)</label>
@@ -1212,7 +1212,7 @@ window.registraPartita = function(){
   const stelleB = parseFloat(document.getElementById('mStelleB').value);
   if(!idA || !idB || idA===idB){ mostraToast('Seleziona due giocatori diversi.'); return; }
   if(isNaN(golA) || isNaN(golB) || golA<0 || golB<0){ mostraToast('Punteggio non valido.'); return; }
-  if(isNaN(stelleA) || isNaN(stelleB) || stelleA<1 || stelleB<1){ mostraToast('Indica le stelle di entrambe le squadre.'); return; }
+  if(isNaN(stelleA) || isNaN(stelleB) || stelleA<0.5 || stelleB<0.5){ mostraToast('Indica le stelle di entrambe le squadre.'); return; }
   const c = calcolaPartita(idA, idB, golA, golB, tipoPartita, stelleA, stelleB);
   const html = `
     <div class="confermaBox">
