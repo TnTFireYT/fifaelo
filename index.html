@@ -168,7 +168,7 @@
       <div class="panel col-classifica">
         <h2>Classifica Elo</h2>
         <table>
-          <thead><tr><th>#</th><th>Giocatore</th><th>Fascia</th><th>Stelle</th><th>Elo</th><th>PG</th><th>V-P-S</th></tr></thead>
+          <thead><tr><th>#</th><th>Giocatore</th><th>Fascia</th><th>Elo</th><th>PG</th><th>V-P-S</th></tr></thead>
           <tbody id="classificaBody"><tr><td colspan="6" class="muted">Caricamento...</td></tr></tbody>
         </table>
       </div>
@@ -203,11 +203,16 @@
       <div class="panel">
         <h2>Registra una partita</h2>
         <label>Giocatore A</label><select id="mA"></select>
+        <label>Stelle squadra scelta da A in questa partita</label>
+        <input type="number" id="mStelleA" min="1" max="5" step="0.5" value="3">
         <div class="row2">
           <div><label>Gol A</label><input type="number" id="mGolA" value="0" min="0" step="1"></div>
           <div><label>Gol B</label><input type="number" id="mGolB" value="0" min="0" step="1"></div>
         </div>
         <label>Giocatore B</label><select id="mB"></select>
+        <label>Stelle squadra scelta da B in questa partita</label>
+        <input type="number" id="mStelleB" min="1" max="5" step="0.5" value="3">
+        <div class="muted" style="font-size:10.5px;margin-top:2px;">Le stelle dipendono dalla squadra scelta in questa partita, non dal giocatore: vanno impostate ogni volta.</div>
         <label>Torneo (facoltativo)</label><select id="mTorneo"><option value="">— nessuno —</option></select>
         <label>Tipo partita (determina il K usato)</label>
         <select id="mTipo">
@@ -322,13 +327,6 @@
         </div>
 
         <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
-          <label style="margin-top:0;">Stelle (soglia minima di Elo → numero di stelle, anche a metà es. 2.5)</label>
-          <div id="listaStelleSoglie"></div>
-          <button class="btn-ghost" style="margin-top:8px;" onclick="aggiungiRigaStelle()">+ aggiungi soglia</button>
-          <button class="btn-oro" style="width:100%;margin-top:10px;" onclick="salvaStelleSoglie()">Salva soglie stelle</button>
-        </div>
-
-        <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
           <label style="margin-top:0;">Tabella moltiplicatore G (differenza gol nel risultato)</label>
           <div class="muted" style="font-size:10.5px;margin-bottom:8px;">
             Per una differenza di gol superiore all'ultima soglia inserita, il valore continua a crescere in automatico secondo la pendenza qui sotto (es. soglia 4 → 1.30, pendenza 0.125: a 5 gol di scarto G=1.425).
@@ -413,15 +411,6 @@ let TABELLA_G = [
   { soglia:3, valore:1.20 },
   { soglia:4, valore:1.30 }
 ];
-/* Soglie Elo -> numero di stelle (si possono aggiungere righe con valori
-   a metà, es. soglia:950, stelle:2.5, per avere gradazioni più fini). */
-let STELLE_SOGLIE = [
-  { soglia:0,    stelle:1 },
-  { soglia:900,  stelle:2 },
-  { soglia:1000, stelle:3 },
-  { soglia:1100, stelle:4 },
-  { soglia:1200, stelle:5 }
-];
 const TIPI_PARTITA = {
   normale:     { label:'Normale',             cssClass:'tipo-normale'     },
   amichevole:  { label:'Amichevole',          cssClass:'tipo-amichevole'  },
@@ -484,12 +473,7 @@ function fasciaDi(elo){
   for(const f of FASCE){ if(elo >= f.soglia) scelta = f; }
   return scelta;
 }
-/* ---------------- stelle, tabella G (differenza gol), tabella S (bonus sfavorito) ---------------- */
-function stelleDi(elo){
-  let scelta = STELLE_SOGLIE[0] || {stelle:1};
-  for(const s of STELLE_SOGLIE){ if(elo >= s.soglia) scelta = s; }
-  return scelta.stelle ?? 1;
-}
+/* ---------------- tabella G (differenza gol), tabella S (bonus sfavorito) ---------------- */
 function valoreTabella(diff, tabella, pendenza){
   if(!tabella || !tabella.length) return 1;
   const ordinata = [...tabella].sort((a,b)=>a.soglia-b.soglia);
@@ -553,8 +537,7 @@ function attaccaListeners(){
     }
     if(v && v.fasce) FASCE = v.fasce;
     if(v && v.tabellaG) TABELLA_G = v.tabellaG;
-    if(v && v.stelleSoglie) STELLE_SOGLIE = v.stelleSoglie;
-    renderClassifica(); renderAdminFasce(); renderAdminTabellaG(); renderAdminStelleSoglie(); aggiornaPreviewK();
+    renderClassifica(); renderAdminFasce(); renderAdminTabellaG(); aggiornaPreviewK();
   });
   onValue(ref(db,'giocatori'), snap=>{
     GIOCATORI = snap.val() || {};
@@ -600,7 +583,6 @@ function renderClassifica(){
       <td><span class="rankNum">${i+1}</span></td>
       <td>${g.avatarUrl?`<img class="avatar-sm" src="${g.avatarUrl}">`:''}${g.nome}</td>
       <td><span class="tier-badge" style="background:${f.colore}33;color:${f.colore};">${f.nome}</span></td>
-      <td>${renderStelleHtml(stelleDi(g.elo||0))}</td>
       <td><b>${Math.round(g.elo||0)}</b>${deltaHtml}</td>
       <td>${g.pg||0}</td>
       <td>${g.v||0}-${g.p||0}-${g.s||0}</td>
@@ -744,7 +726,7 @@ async function controllaPrimoAvvio(){
         await update(ref(db,'config'), {
           eloIniziale:1000, kNormale:32, kAmichevole:20, kFinale:40, kFinale3:35, kEliminazione:36,
           moltPrimeCinque:2, moltSeiDieci:1.5, x:400, pendenzaG:0.125, percStellaMezza:0.05,
-          fasce:FASCE, tabellaG:TABELLA_G, stelleSoglie:STELLE_SOGLIE, adminPassHash: hash
+          fasce:FASCE, tabellaG:TABELLA_G, adminPassHash: hash
         });
         mostraToast('Password amministratore impostata. Ora puoi accedere dalla tab Admin.');
       }
@@ -800,7 +782,6 @@ function renderAdminPannello(){
   document.getElementById('cfgContattiEmail').value = CONFIG.contattiEmail || '';
   renderAdminFasce();
   renderAdminTabellaG();
-  renderAdminStelleSoglie();
   aggiornaPreviewK();
 }
 /* =====================================================================
@@ -941,7 +922,7 @@ window.salvaModificaTorneo = async function(id){
    ===================================================================== */
 /* Calcola tutti i valori di una partita SENZA scrivere nulla su Firebase:
    usata sia per l'anteprima di conferma sia, alla conferma, per il salvataggio vero. */
-function calcolaPartita(idA, idB, golA, golB, tipoPartita){
+function calcolaPartita(idA, idB, golA, golB, tipoPartita, stelleA, stelleB){
   const gA = GIOCATORI[idA], gB = GIOCATORI[idB];
   const eloA = gA.elo||CONFIG.eloIniziale, eloB = gB.elo||CONFIG.eloIniziale;
   const x = CONFIG.x || 400;
@@ -954,7 +935,12 @@ function calcolaPartita(idA, idB, golA, golB, tipoPartita){
   const moltB = moltiplicatorePerEsperienza(gB.pg||0);
   const diffGol = Math.abs(golA-golB);
   const G = calcolaG(diffGol);
-  const stelleA = stelleDi(eloA), stelleB = stelleDi(eloB);
+  /* Le stelle sono legate SOLO alla squadra scelta in questa partita (in
+     FIFA ogni partita si può scegliere una squadra diversa), non al
+     giocatore: arrivano come parametro dal form di registrazione partita. */
+  stelleA = parseFloat(stelleA); stelleB = parseFloat(stelleB);
+  if(isNaN(stelleA)) stelleA = 3;
+  if(isNaN(stelleB)) stelleB = 3;
   const diffStelle = Math.abs(stelleA-stelleB);
   /* S dipende dal SEGNO della prestazione rispetto all'atteso (non dal
      risultato letterale V/P/S): lo sfavorito, se fa meglio dell'atteso
@@ -990,9 +976,12 @@ window.registraPartita = function(){
   const golB = parseInt(document.getElementById('mGolB').value);
   const torneoId = document.getElementById('mTorneo').value || null;
   const tipoPartita = document.getElementById('mTipo').value || 'normale';
+  const stelleA = parseFloat(document.getElementById('mStelleA').value);
+  const stelleB = parseFloat(document.getElementById('mStelleB').value);
   if(!idA || !idB || idA===idB){ mostraToast('Seleziona due giocatori diversi.'); return; }
   if(isNaN(golA) || isNaN(golB) || golA<0 || golB<0){ mostraToast('Punteggio non valido.'); return; }
-  const c = calcolaPartita(idA, idB, golA, golB, tipoPartita);
+  if(isNaN(stelleA) || isNaN(stelleB) || stelleA<1 || stelleB<1){ mostraToast('Indica le stelle di entrambe le squadre.'); return; }
+  const c = calcolaPartita(idA, idB, golA, golB, tipoPartita, stelleA, stelleB);
   const html = `
     <div class="confermaBox">
       <div><b>${c.gA.nome}</b> ${golA} - ${golB} <b>${c.gB.nome}</b> ${renderStelleHtml(c.stelleA)} vs ${renderStelleHtml(c.stelleB)}</div>
@@ -1046,6 +1035,7 @@ async function confermaRegistraPartita(c, torneoId){
   });
   document.getElementById('mGolA').value=0; document.getElementById('mGolB').value=0;
   document.getElementById('mTipo').value='normale';
+  document.getElementById('mStelleA').value=3; document.getElementById('mStelleB').value=3;
   chiudiModal();
   aggiornaPreviewK();
   mostraToast(`Partita registrata (${TIPI_PARTITA[c.tipoPartita].label}). K eff.: ${c.gA.nome}=${Math.round(c.kEffettivoA*10)/10}, ${c.gB.nome}=${Math.round(c.kEffettivoB*10)/10}.`);
@@ -1166,25 +1156,7 @@ window.salvaConfig = async function(){
   await update(ref(db,'config'), { eloIniziale, kNormale, kAmichevole, kFinale, kFinale3, kEliminazione, moltPrimeCinque, moltSeiDieci, x });
   mostraToast('Impostazioni salvate. Valide solo per le prossime partite.');
 }
-/* ---------------- editor generico soglie/stelle/G/S (usato dalle 3 tabelle sotto) ---------------- */
-function renderAdminStelleSoglie(){
-  const el = document.getElementById('listaStelleSoglie');
-  if(!el) return;
-  el.innerHTML = STELLE_SOGLIE.map((r,i)=>`
-    <div class="tabellaRiga">
-      <input type="number" step="10" value="${r.soglia}" onchange="modificaRigaStelle(${i},'soglia',this.value)" placeholder="Soglia Elo">
-      <input type="number" step="0.5" value="${r.stelle}" onchange="modificaRigaStelle(${i},'stelle',this.value)" placeholder="Stelle">
-      <button class="btn-ghost" style="padding:9px 11px;" onclick="rimuoviRigaStelle(${i})" title="Elimina soglia">🗑</button>
-    </div>`).join('');
-}
-window.modificaRigaStelle = function(i, campo, valore){ STELLE_SOGLIE[i][campo] = parseFloat(valore)||0; }
-window.aggiungiRigaStelle = function(){ STELLE_SOGLIE.push({soglia:0, stelle:1}); renderAdminStelleSoglie(); }
-window.rimuoviRigaStelle = function(i){ STELLE_SOGLIE.splice(i,1); renderAdminStelleSoglie(); }
-window.salvaStelleSoglie = async function(){
-  STELLE_SOGLIE.sort((a,b)=>a.soglia-b.soglia);
-  await update(ref(db,'config'), { stelleSoglie: STELLE_SOGLIE });
-  mostraToast('Soglie stelle salvate.');
-}
+/* ---------------- editor generico soglie/G/S (usato dalle tabelle sotto) ---------------- */
 function renderAdminTabellaG(){
   const el = document.getElementById('listaTabellaG');
   if(!el) return;
