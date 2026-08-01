@@ -63,16 +63,20 @@
   tr.me{background:#1c243855;}
   .rankNum{color:var(--oro);font-weight:700;width:22px;display:inline-block;}
   .avatar-sm{width:26px;height:26px;border-radius:50%;object-fit:cover;background:#0b1019;border:1px solid var(--border);vertical-align:middle;margin-right:8px;}
-  .tier-badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;}
+  .nomeGiocatoreLink:hover{color:var(--oro);}
   .stelleRating{color:var(--oro);letter-spacing:1px;font-size:13px;white-space:nowrap;}
   .confermaBox{background:#0b1019;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12.5px;line-height:1.7;}
   .confermaBox b{color:var(--oro);}
   .tabellaRiga{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;margin-top:6px;}
   .feed div{border-bottom:1px dashed var(--border);padding:9px 0;font-size:12px;color:#c7cede;}
+  .feed div.partitaRiga:hover{background:#1c243833;}
   .feed div b{color:var(--text);}
   .feed .esito-V{color:var(--verde);font-weight:700;}
   .feed .esito-P{color:var(--pareggio);font-weight:700;}
   .feed .esito-S{color:var(--rosso);font-weight:700;}
+  .esito-V{color:var(--verde);font-weight:700;}
+  .esito-P{color:var(--pareggio);font-weight:700;}
+  .esito-S{color:var(--rosso);font-weight:700;}
   .matchScore{font-family:var(--disp);font-weight:700;font-size:15px;}
   .tipoBadge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-left:6px;vertical-align:middle;}
   .tipo-normale{background:#2b355255;color:#9aa2ba;}
@@ -87,6 +91,7 @@
   .podio{font-size:11px;color:#9aa2ba;margin-top:4px;}
   .podio b{color:var(--oro);}
   .torneoItem{padding:12px 0;border-bottom:1px solid var(--border);}
+  .torneoItem:hover{background:#1c243833;}
   .torneoItem .nome{font-weight:600;font-size:14px;}
   .torneoItem .data{color:#9aa2ba;font-size:11px;text-transform:uppercase;}
   .toast{position:fixed;bottom:18px;right:18px;left:18px;margin:0 auto;max-width:320px;background:var(--panel);border:1px solid var(--oro-dim);padding:10px 16px;border-radius:8px;font-size:12.5px;opacity:0;transform:translateY(10px);transition:all .25s;pointer-events:none;z-index:80;}
@@ -168,8 +173,8 @@
       <div class="panel col-classifica">
         <h2>Classifica Elo</h2>
         <table>
-          <thead><tr><th>#</th><th>Giocatore</th><th>Fascia</th><th>Elo</th><th>PG</th><th>V-P-S</th></tr></thead>
-          <tbody id="classificaBody"><tr><td colspan="6" class="muted">Caricamento...</td></tr></tbody>
+          <thead><tr><th>#</th><th>Giocatore</th><th>Elo</th><th>PG</th><th>V-P-S</th></tr></thead>
+          <tbody id="classificaBody"><tr><td colspan="5" class="muted">Caricamento...</td></tr></tbody>
         </table>
       </div>
       <div class="panel col-partite">
@@ -320,13 +325,6 @@
         <button class="btn-blu" style="width:100%;margin-top:12px;" onclick="salvaConfig()">Salva impostazioni</button>
 
         <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
-          <label style="margin-top:0;">Fasce (soglia minima di Elo → nome fascia)</label>
-          <div id="listaFasce"></div>
-          <button class="btn-ghost" style="margin-top:8px;" onclick="aggiungiFasciaVuota()">+ aggiungi fascia</button>
-          <button class="btn-oro" style="width:100%;margin-top:10px;" onclick="salvaFasce()">Salva fasce</button>
-        </div>
-
-        <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
           <label style="margin-top:0;">Tabella moltiplicatore G (differenza gol nel risultato)</label>
           <div class="muted" style="font-size:10.5px;margin-bottom:8px;">
             Per una differenza di gol superiore all'ultima soglia inserita, il valore continua a crescere in automatico secondo la pendenza qui sotto (es. soglia 4 → 1.30, pendenza 0.125: a 5 gol di scarto G=1.425).
@@ -434,13 +432,6 @@ function moltiplicatorePerEsperienza(partiteGiaGiocate){
   if(pg < 10) return CONFIG.moltSeiDieci ?? 1.5;
   return 1;
 }
-let FASCE = [
-  { soglia:0,    nome:'Bronzo',   colore:'#a9673a' },
-  { soglia:900,  nome:'Argento',  colore:'#9aa2ba' },
-  { soglia:1000, nome:'Oro',      colore:'#d8b24a' },
-  { soglia:1100, nome:'Platino',  colore:'#4fb3bf' },
-  { soglia:1200, nome:'Diamante', colore:'#7d9dff' }
-];
 let GIOCATORI = {};  // id -> {nome, elo, pg, v, p, s, ultimoDelta}
 let PARTITE = [];    // array ordinato per timestamp
 let TORNEI = {};
@@ -468,11 +459,6 @@ function apriModal(titolo, html){
     </div>`;
 }
 window.chiudiModal = function(){ document.getElementById('modalRoot').innerHTML=''; }
-function fasciaDi(elo){
-  let scelta = FASCE[0] || {nome:'—',colore:'#9aa2ba'};
-  for(const f of FASCE){ if(elo >= f.soglia) scelta = f; }
-  return scelta;
-}
 /* ---------------- tabella G (differenza gol), tabella S (bonus sfavorito) ---------------- */
 function valoreTabella(diff, tabella, pendenza){
   if(!tabella || !tabella.length) return 1;
@@ -535,9 +521,8 @@ function attaccaListeners(){
         contattiEmail: v.contattiEmail || ''
       };
     }
-    if(v && v.fasce) FASCE = v.fasce;
     if(v && v.tabellaG) TABELLA_G = v.tabellaG;
-    renderClassifica(); renderAdminFasce(); renderAdminTabellaG(); aggiornaPreviewK();
+    renderClassifica(); renderAdminTabellaG(); aggiornaPreviewK();
   });
   onValue(ref(db,'giocatori'), snap=>{
     GIOCATORI = snap.val() || {};
@@ -569,20 +554,18 @@ window.vaiTabAdmin = function(){ cambiaTab('admin'); document.querySelector('[da
 function renderClassifica(){
   const body = document.getElementById('classificaBody');
   let lista = Object.keys(GIOCATORI).map(id=>({id, ...GIOCATORI[id]}));
-  if(!lista.length){ body.innerHTML = '<tr><td colspan="7" class="muted">Nessun giocatore ancora.</td></tr>'; return; }
+  if(!lista.length){ body.innerHTML = '<tr><td colspan="5" class="muted">Nessun giocatore ancora.</td></tr>'; return; }
   lista.sort((a,b)=>(b.elo||0)-(a.elo||0));
   const listaCompleta = lista; // usata per mantenere la posizione # anche filtrando
   lista = lista.filter(g=>matchRicerca(g.nome));
-  if(!lista.length){ body.innerHTML = '<tr><td colspan="7" class="muted">Nessun giocatore corrisponde alla ricerca.</td></tr>'; return; }
+  if(!lista.length){ body.innerHTML = '<tr><td colspan="5" class="muted">Nessun giocatore corrisponde alla ricerca.</td></tr>'; return; }
   body.innerHTML = lista.map(g=>{
     const i = listaCompleta.findIndex(x=>x.id===g.id);
-    const f = fasciaDi(g.elo||0);
     const delta = g.ultimoDelta||0;
     const deltaHtml = delta ? `<span class="deltaTag ${delta>0?'up':'down'}">${delta>0?'▲':'▼'} ${Math.abs(delta)}</span>` : '';
     return `<tr>
       <td><span class="rankNum">${i+1}</span></td>
-      <td>${g.avatarUrl?`<img class="avatar-sm" src="${g.avatarUrl}">`:''}${g.nome}</td>
-      <td><span class="tier-badge" style="background:${f.colore}33;color:${f.colore};">${f.nome}</span></td>
+      <td><span class="nomeGiocatoreLink" style="cursor:pointer;" onclick="mostraDettaglioGiocatore('${g.id}')">${g.avatarUrl?`<img class="avatar-sm" src="${g.avatarUrl}">`:''}${g.nome}</span></td>
       <td><b>${Math.round(g.elo||0)}</b>${deltaHtml}</td>
       <td>${g.pg||0}</td>
       <td>${g.v||0}-${g.p||0}-${g.s||0}</td>
@@ -619,7 +602,7 @@ function renderPartite(){
       ? `<span class="muted" style="font-size:10.5px;">K: ${nomeA} ${Math.round((p.kUsatoA??p.kUsato??0)*10)/10}${p.moltA>1?` (x${p.moltA})`:''} · ${nomeB} ${Math.round((p.kUsatoB??p.kUsato??0)*10)/10}${p.moltB>1?` (x${p.moltB})`:''}</span>`
       : (p.kUsato ? `<span class="muted" style="font-size:10.5px;">K${p.kUsato}</span>` : '');
     const gsDettaglio = (p.gUsato!=null) ? `<span class="muted" style="font-size:10.5px;"> · G${Math.round(p.gUsato*100)/100}${(p.sUsatoA>1||p.sUsatoB>1)?` · S: ${nomeA} ${Math.round((p.sUsatoA??1)*100)/100} · ${nomeB} ${Math.round((p.sUsatoB??1)*100)/100}`:''}${p.xUsato?` · X${p.xUsato}`:''}</span>` : '';
-    return `<div>
+    return `<div class="partitaRiga" style="cursor:pointer;" onclick="mostraDettaglioPartita('${p.id}')">
       <div class="cardScore">
         <span><b>${nomeA}</b> <span class="matchScore">${p.golA} - ${p.golB}</span> <b>${nomeB}</b>${tipoBadge}</span>
         <span class="muted">${data}${torneo}</span>
@@ -632,6 +615,99 @@ function renderPartite(){
     </div>`;
   }).join('');
   aggiornaPagerPartite(paginaPartite, totalePagine);
+}
+/* Dettaglio completo di una singola partita, aperto in modal al click sulla riga. */
+window.mostraDettaglioPartita = function(id){
+  const p = PARTITE.find(x=>x.id===id);
+  if(!p) return;
+  const nomeA = (GIOCATORI[p.giocatoreA]||{}).nome || '—';
+  const nomeB = (GIOCATORI[p.giocatoreB]||{}).nome || '—';
+  const data = new Date(p.timestamp).toLocaleDateString('it-IT');
+  const torneo = p.torneoId && TORNEI[p.torneoId] ? TORNEI[p.torneoId].nome : null;
+  const tipoInfo = TIPI_PARTITA[p.tipo] || TIPI_PARTITA.normale;
+  const dA = p.eloA_dopo - p.eloA_prima, dB = p.eloB_dopo - p.eloB_prima;
+  const esitoA = esitoLettera(p.golA, p.golB), esitoB = esitoLettera(p.golB, p.golA);
+  const esitoTesto = { V:'Vittoria', P:'Pareggio', S:'Sconfitta' };
+  const stelleHtml = (p.stelleA_prima!=null && p.stelleB_prima!=null)
+    ? `<div style="margin-top:10px;">${nomeA}: ${renderStelleHtml(p.stelleA_prima)} &nbsp;vs&nbsp; ${nomeB}: ${renderStelleHtml(p.stelleB_prima)}</div>`
+    : '';
+  const html = `
+    <div class="confermaBox">
+      <div class="cardScore">
+        <span><b>${nomeA}</b> <span class="matchScore">${p.golA} - ${p.golB}</span> <b>${nomeB}</b></span>
+        <span class="tipoBadge ${tipoInfo.cssClass}">${tipoInfo.label}</span>
+      </div>
+      <div class="muted" style="margin-top:6px;">${data}${torneo?` · ${torneo}`:''}</div>
+      ${stelleHtml}
+      <div style="margin-top:10px;">
+        <div><b>${nomeA}</b>: ${esitoTesto[esitoA]} — Elo ${Math.round(p.eloA_prima)} → <b>${Math.round(p.eloA_dopo)}</b> (<span class="${dA>0?'up':(dA<0?'down':'flat')}">${dA>=0?'+':''}${Math.round(dA)}</span>)</div>
+        <div><b>${nomeB}</b>: ${esitoTesto[esitoB]} — Elo ${Math.round(p.eloB_prima)} → <b>${Math.round(p.eloB_dopo)}</b> (<span class="${dB>0?'up':(dB<0?'down':'flat')}">${dB>=0?'+':''}${Math.round(dB)}</span>)</div>
+      </div>
+      <div class="muted" style="margin-top:10px;font-size:11px;">
+        K base ${p.kBase ?? '—'} · G(diff. gol ${p.diffGol ?? '—'}) ${p.gUsato!=null?Math.round(p.gUsato*100)/100:'—'} · X ${p.xUsato ?? '—'}<br>
+        ${nomeA}: espon. x${p.moltA ?? 1} · S x${p.sUsatoA!=null?Math.round(p.sUsatoA*100)/100:1} → K eff. ${p.kUsatoA!=null?Math.round(p.kUsatoA*10)/10:'—'}<br>
+        ${nomeB}: espon. x${p.moltB ?? 1} · S x${p.sUsatoB!=null?Math.round(p.sUsatoB*100)/100:1} → K eff. ${p.kUsatoB!=null?Math.round(p.kUsatoB*10)/10:'—'}
+      </div>
+    </div>
+  `;
+  apriModal('Dettaglio partita', html);
+}
+/* Dettaglio di un giocatore: forma nelle ultime 5 partite, elenco cliccabile
+   delle stesse (con variazione Elo) e piazzamenti nei tornei a cui ha
+   partecipato. Aperto in modal al click sul nome in classifica. */
+window.mostraDettaglioGiocatore = function(gid){
+  const g = GIOCATORI[gid];
+  if(!g) return;
+  const partiteGiocatore = PARTITE.filter(p=>p.giocatoreA===gid || p.giocatoreB===gid)
+    .sort((a,b)=>b.timestamp-a.timestamp).slice(0,5);
+  const esitoTesto = { V:'Vittoria', P:'Pareggio', S:'Sconfitta' };
+  const formaHtml = partiteGiocatore.length ? partiteGiocatore.map(p=>{
+    const sonoA = p.giocatoreA===gid;
+    const esito = sonoA ? esitoLettera(p.golA,p.golB) : esitoLettera(p.golB,p.golA);
+    return `<span class="esito-${esito}" title="${esitoTesto[esito]}" style="display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background:#0b1019;margin-right:4px;font-size:10.5px;">${esito}</span>`;
+  }).join('') : '<span class="muted">Nessuna partita ancora.</span>';
+  const listaPartiteHtml = partiteGiocatore.length ? partiteGiocatore.map(p=>{
+    const sonoA = p.giocatoreA===gid;
+    const nomeAvv = (GIOCATORI[sonoA?p.giocatoreB:p.giocatoreA]||{}).nome || '—';
+    const eloPrima = sonoA?p.eloA_prima:p.eloB_prima, eloDopo = sonoA?p.eloA_dopo:p.eloB_dopo;
+    const delta = eloDopo-eloPrima;
+    const data = new Date(p.timestamp).toLocaleDateString('it-IT');
+    const esito = sonoA ? esitoLettera(p.golA,p.golB) : esitoLettera(p.golB,p.golA);
+    return `<div class="partitaRiga" style="cursor:pointer;padding:8px 0;border-bottom:1px dashed var(--border);" onclick="mostraDettaglioPartita('${p.id}')">
+      <div class="cardScore">
+        <span><span class="esito-${esito}">${esitoTesto[esito]}</span> vs <b>${nomeAvv}</b> <span class="matchScore">${p.golA} - ${p.golB}</span></span>
+        <span class="muted">${data}</span>
+      </div>
+      <div class="muted" style="margin-top:2px;font-size:11px;">Elo ${Math.round(eloPrima)}→${Math.round(eloDopo)} (<span class="${delta>0?'up':(delta<0?'down':'flat')}">${delta>=0?'+':''}${Math.round(delta)}</span>)</div>
+    </div>`;
+  }).join('') : '';
+  const tornei = Object.keys(TORNEI)
+    .filter(tid=>{ const t=TORNEI[tid]; return (t.partecipanti && t.partecipanti[gid]) || (t.posizioni && t.posizioni[gid]!=null); })
+    .map(tid=>({id:tid, ...TORNEI[tid]}))
+    .sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+  const torneiHtml = tornei.length ? tornei.map(t=>{
+    const pos = t.posizioni ? t.posizioni[gid] : null;
+    return `<div class="partitaRiga" style="cursor:pointer;padding:8px 0;border-bottom:1px dashed var(--border);" onclick="mostraPartiteTorneo('${t.id}')">
+      <div class="cardScore">
+        <span>${pos!=null?`<b style="color:var(--oro);">${pos}°</b> `:''}${t.nome}</span>
+        <span class="muted" style="font-size:11px;">${t.data?new Date(t.data).toLocaleDateString('it-IT'):''}${pos==null?' · partecipante':''}</span>
+      </div>
+    </div>`;
+  }).join('') : '<span class="muted">Nessun torneo ancora.</span>';
+  const html = `
+    <div class="cardScore">
+      <span><b style="font-size:16px;">${g.nome}</b></span>
+      <span><b>${Math.round(g.elo||0)}</b> Elo</span>
+    </div>
+    <div class="muted" style="margin-top:2px;font-size:11px;">${g.pg||0} partite · ${g.v||0}V-${g.p||0}P-${g.s||0}S</div>
+    <div class="muted" style="margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Forma (ultime 5)</div>
+    <div style="margin-top:6px;">${formaHtml}</div>
+    <div class="muted" style="margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Ultime partite</div>
+    <div style="margin-top:6px;">${listaPartiteHtml}</div>
+    <div class="muted" style="margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Tornei</div>
+    <div style="margin-top:6px;">${torneiHtml}</div>
+  `;
+  apriModal('Dettaglio giocatore', html);
 }
 function aggiornaPagerPartite(pag, totale){
   document.getElementById('partitePagLabel').textContent = `Pag. ${pag}/${totale}`;
@@ -657,20 +733,76 @@ function renderTornei(){
     if(t.posizioni){
       const podio = Object.entries(t.posizioni)
         .map(([gid,pos])=>({nome:(GIOCATORI[gid]||{}).nome || '—', pos}))
-        .sort((a,b)=>a.pos-b.pos).slice(0,3);
+        .sort((a,b)=>a.pos-b.pos).slice(0,4);
       if(podio.length){
-        const medaglie = ['🥇','🥈','🥉'];
+        const medaglie = ['🥇','🥈','🥉','4️⃣'];
         podioHtml = `<div class="podio">${podio.map((p,i)=>`${medaglie[i]||'•'} <b>${p.nome}</b>`).join(' &nbsp;·&nbsp; ')}</div>`;
       }
     }
     return `
-    <div class="torneoItem">
+    <div class="torneoItem" style="cursor:pointer;" onclick="mostraPartiteTorneo('${t.id}')">
       <div class="nome">${t.nome}</div>
       <div class="data">${t.data ? new Date(t.data).toLocaleDateString('it-IT') : '—'}</div>
       ${podioHtml}
     </div>`;
   }).join('');
   aggiornaPagerTornei(paginaTornei, totalePagine);
+}
+/* Elenco di tutte le partite di un torneo, aperto in modal al click sulla riga. */
+window.mostraPartiteTorneo = function(torneoId){
+  const t = TORNEI[torneoId];
+  if(!t) return;
+  const partite = PARTITE.filter(p=>p.torneoId===torneoId).sort((a,b)=>b.timestamp-a.timestamp);
+  let podioHtml = '';
+  if(t.posizioni){
+    const podio = Object.entries(t.posizioni)
+      .map(([gid,pos])=>({nome:(GIOCATORI[gid]||{}).nome || '—', pos}))
+      .sort((a,b)=>a.pos-b.pos).slice(0,4);
+    if(podio.length){
+      const medaglie = ['🥇','🥈','🥉','4️⃣'];
+      podioHtml = `<div class="podio" style="margin-top:6px;">${podio.map((p,i)=>`${medaglie[i]||'•'} <b>${p.nome}</b>`).join(' &nbsp;·&nbsp; ')}</div>`;
+    }
+  }
+  const idPartecipanti = new Set([
+    ...Object.keys(t.partecipanti||{}),
+    ...Object.keys(t.posizioni||{})
+  ]);
+  let partecipantiHtml = '';
+  if(idPartecipanti.size){
+    const elenco = [...idPartecipanti]
+      .map(gid=>({ nome:(GIOCATORI[gid]||{}).nome || '—', pos: t.posizioni ? t.posizioni[gid] : undefined }))
+      .sort((a,b)=>{
+        if(a.pos!=null && b.pos!=null) return a.pos-b.pos;
+        if(a.pos!=null) return -1;
+        if(b.pos!=null) return 1;
+        return a.nome.localeCompare(b.nome);
+      });
+    partecipantiHtml = `
+      <div class="muted" style="margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Partecipanti</div>
+      <div style="margin-top:6px;font-size:12.5px;line-height:1.9;">
+        ${elenco.map(p=>`${p.pos!=null?`<b style="color:var(--oro);">${p.pos}°</b> `:''}${p.nome}`).join('<br>')}
+      </div>`;
+  }
+  const listaHtml = partite.length ? partite.map(p=>{
+    const nomeA = (GIOCATORI[p.giocatoreA]||{}).nome || '—';
+    const nomeB = (GIOCATORI[p.giocatoreB]||{}).nome || '—';
+    const data = new Date(p.timestamp).toLocaleDateString('it-IT');
+    const tipoInfo = TIPI_PARTITA[p.tipo] || TIPI_PARTITA.normale;
+    return `<div class="partitaRiga" style="cursor:pointer;padding:8px 0;border-bottom:1px dashed var(--border);" onclick="mostraDettaglioPartita('${p.id}')">
+      <div class="cardScore">
+        <span><b>${nomeA}</b> <span class="matchScore">${p.golA} - ${p.golB}</span> <b>${nomeB}</b><span class="tipoBadge ${tipoInfo.cssClass}" style="margin-left:6px;">${tipoInfo.label}</span></span>
+        <span class="muted">${data}</span>
+      </div>
+    </div>`;
+  }).join('') : '<span class="muted">Nessuna partita registrata per questo torneo.</span>';
+  const html = `
+    <div class="data" style="margin-bottom:4px;">${t.data ? new Date(t.data).toLocaleDateString('it-IT') : '—'}</div>
+    ${podioHtml}
+    ${partecipantiHtml}
+    <div class="muted" style="margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Partite</div>
+    <div style="margin-top:6px;">${listaHtml}</div>
+  `;
+  apriModal(t.nome, html);
 }
 function aggiornaPagerTornei(pag, totale){
   document.getElementById('torneiPagLabel').textContent = `Pag. ${pag}/${totale}`;
@@ -726,7 +858,7 @@ async function controllaPrimoAvvio(){
         await update(ref(db,'config'), {
           eloIniziale:1000, kNormale:32, kAmichevole:20, kFinale:40, kFinale3:35, kEliminazione:36,
           moltPrimeCinque:2, moltSeiDieci:1.5, x:400, pendenzaG:0.125, percStellaMezza:0.05,
-          fasce:FASCE, tabellaG:TABELLA_G, adminPassHash: hash
+          tabellaG:TABELLA_G, adminPassHash: hash
         });
         mostraToast('Password amministratore impostata. Ora puoi accedere dalla tab Admin.');
       }
@@ -780,7 +912,6 @@ function renderAdminPannello(){
   document.getElementById('cfgChiSiamo').value = CONFIG.chiSiamoTesto || '';
   document.getElementById('cfgRegolamentoUrl').value = CONFIG.regolamentoUrl || '';
   document.getElementById('cfgContattiEmail').value = CONFIG.contattiEmail || '';
-  renderAdminFasce();
   renderAdminTabellaG();
   aggiornaPreviewK();
 }
@@ -853,10 +984,10 @@ function renderTorneiAdmin(){
   const lista = Object.keys(TORNEI).map(id=>({id,...TORNEI[id]})).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
   if(!lista.length){ el.innerHTML = '<span class="muted">Nessun torneo ancora.</span>'; return; }
   el.innerHTML = lista.map(t=>{
-    const nPartecipanti = t.posizioni ? Object.keys(t.posizioni).length : 0;
+    const nPartecipanti = t.partecipanti ? Object.keys(t.partecipanti).length : (t.posizioni ? Object.keys(t.posizioni).length : 0);
     return `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap;">
-      <span>${t.nome} <span class="muted">${t.data?new Date(t.data).toLocaleDateString('it-IT'):''}${nPartecipanti?` · ${nPartecipanti} in classifica`:''}</span></span>
+      <span>${t.nome} <span class="muted">${t.data?new Date(t.data).toLocaleDateString('it-IT'):''}${nPartecipanti?` · ${nPartecipanti} partecipanti`:''}</span></span>
       <span>
         <button class="btn-ghost" onclick="apriModificaTorneo('${t.id}')">✏️ Modifica</button>
         <button class="btn-ghost" onclick="eliminaTorneo('${t.id}')">🗑 Elimina</button>
@@ -881,18 +1012,23 @@ window.apriModificaTorneo = function(id){
   const t = TORNEI[id];
   if(!t) return;
   const posizioniAttuali = t.posizioni || {};
+  const partecipantiAttuali = t.partecipanti || {};
   const listaGiocatori = Object.keys(GIOCATORI).map(gid=>({gid, ...GIOCATORI[gid]})).sort((a,b)=>a.nome.localeCompare(b.nome));
-  const righeGiocatori = listaGiocatori.map(g=>`
-    <span>${g.nome}</span>
-    <input type="number" min="1" step="1" id="posG_${g.gid}" placeholder="—" value="${posizioniAttuali[g.gid] ?? ''}">
-  `).join('');
+  const righeGiocatori = listaGiocatori.map(g=>{
+    const partecipa = partecipantiAttuali[g.gid] || posizioniAttuali[g.gid]!=null;
+    return `
+    <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;text-transform:none;letter-spacing:0;margin:0;">
+      <input type="checkbox" id="partG_${g.gid}" style="width:auto;" ${partecipa?'checked':''}> ${g.nome}
+    </label>
+    <input type="number" min="1" step="1" id="posG_${g.gid}" placeholder="pos. —" value="${posizioniAttuali[g.gid] ?? ''}">
+  `;}).join('');
   apriModal('Modifica torneo', `
     <label>Nome</label>
     <input type="text" id="editTNome" value="${t.nome}">
     <label>Data</label>
     <input type="date" id="editTData" value="${t.data||''}">
-    <label style="margin-top:14px;">Posizione finale dei partecipanti</label>
-    <div class="muted" style="font-size:10.5px;">Inserisci la posizione (1, 2, 3...) solo per chi ha partecipato a questo torneo. Lascia vuoto chi non ha partecipato.</div>
+    <label style="margin-top:14px;">Partecipanti e posizione finale</label>
+    <div class="muted" style="font-size:10.5px;">Spunta chi ha partecipato. La posizione finale è facoltativa: lasciala vuota se non la conosci ancora, il giocatore comparirà comunque tra i partecipanti.</div>
     <div class="posizioniList">${righeGiocatori || '<span class="muted">Nessun giocatore disponibile.</span>'}</div>
     <button class="btn-blu" style="width:100%;margin-top:14px;" onclick="salvaModificaTorneo('${id}')">Salva</button>
   `);
@@ -902,13 +1038,17 @@ window.salvaModificaTorneo = async function(id){
   const data = document.getElementById('editTData').value;
   if(!nome){ mostraToast('Il nome non può essere vuoto.'); return; }
   const posizioni = {};
+  const partecipanti = {};
   Object.keys(GIOCATORI).forEach(gid=>{
+    const chk = document.getElementById('partG_'+gid);
     const el = document.getElementById('posG_'+gid);
-    if(!el) return;
+    if(!chk || !el) return;
     const val = parseInt(el.value);
-    if(!isNaN(val) && val>0) posizioni[gid] = val;
+    const haPosizione = !isNaN(val) && val>0;
+    if(haPosizione) posizioni[gid] = val;
+    if(chk.checked || haPosizione) partecipanti[gid] = true;
   });
-  await update(ref(db,'tornei/'+id), { nome, data: data||null, posizioni });
+  await update(ref(db,'tornei/'+id), { nome, data: data||null, posizioni, partecipanti });
   chiudiModal();
   mostraToast('Torneo aggiornato.');
 }
@@ -1182,33 +1322,6 @@ window.salvaPercStella = async function(){
   const percStellaMezza = parseFloat(document.getElementById('cfgPercStellaMezza').value);
   await update(ref(db,'config'), { percStellaMezza: isNaN(percStellaMezza)?0.05:percStellaMezza });
   mostraToast('Percentuale S salvata.');
-}
-function renderAdminFasce(){
-  const el = document.getElementById('listaFasce');
-  if(!el) return;
-  el.innerHTML = FASCE.map((f,i)=>`
-    <div class="fasciaRow" style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;margin-top:6px;">
-      <input type="number" value="${f.soglia}" onchange="modificaFascia(${i},'soglia',this.value)" placeholder="Soglia Elo">
-      <input type="text" value="${f.nome}" onchange="modificaFascia(${i},'nome',this.value)" placeholder="Nome fascia">
-      <button class="btn-ghost" style="padding:9px 11px;" onclick="rimuoviFascia(${i})" title="Elimina fascia">🗑</button>
-    </div>`).join('');
-}
-window.modificaFascia = function(i, campo, valore){
-  FASCE[i][campo] = campo==='soglia' ? parseFloat(valore)||0 : valore;
-}
-window.aggiungiFasciaVuota = function(){
-  FASCE.push({soglia:0, nome:'Nuova fascia', colore:'#7d9dff'});
-  renderAdminFasce();
-}
-window.rimuoviFascia = function(i){
-  if(!confirm(`Eliminare la fascia "${FASCE[i].nome}"? Ricordati di premere "Salva fasce" per rendere definitiva la modifica.`)) return;
-  FASCE.splice(i,1);
-  renderAdminFasce();
-}
-window.salvaFasce = async function(){
-  FASCE.sort((a,b)=>a.soglia-b.soglia);
-  await update(ref(db,'config'), { fasce: FASCE });
-  mostraToast('Fasce salvate.');
 }
 window.cambiaPasswordAdmin = async function(){
   const nuova = document.getElementById('cfgNuovaPass').value;
