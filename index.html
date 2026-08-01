@@ -706,8 +706,100 @@ window.mostraDettaglioGiocatore = function(gid){
     <div style="margin-top:6px;">${listaPartiteHtml}</div>
     <div class="muted" style="margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Tornei</div>
     <div style="margin-top:6px;">${torneiHtml}</div>
+    <button class="btn-oro" style="width:100%;margin-top:16px;" onclick="apriSelezioneTestaATesta('${gid}')">⚔️ Testa a testa</button>
   `;
   apriModal('Dettaglio giocatore', html);
+}
+/* Selezione avversario per il confronto testa a testa. */
+window.apriSelezioneTestaATesta = function(gid){
+  const opzioni = Object.keys(GIOCATORI).filter(id=>id!==gid).sort((a,b)=>GIOCATORI[a].nome.localeCompare(GIOCATORI[b].nome))
+    .map(id=>`<option value="${id}">${GIOCATORI[id].nome}</option>`).join('');
+  apriModal('Testa a testa', `
+    <label>Confronta ${GIOCATORI[gid].nome} con</label>
+    <select id="ttAvversario">${opzioni || '<option value="">— nessun altro giocatore —</option>'}</select>
+    <button class="btn-oro" style="width:100%;margin-top:14px;" onclick="mostraTestaATesta('${gid}', document.getElementById('ttAvversario').value)">Confronta</button>
+  `);
+}
+/* Kappa del modello Davidson (probabilità di pareggio), calibrato sulla
+   percentuale REALE di pareggi tra tutte le partite registrate: se i due
+   giocatori sono alla pari, il modello riproduce circa questa percentuale
+   di pareggio. Fallback ragionevole se non ci sono ancora abbastanza dati. */
+function calcolaKappaPareggio(){
+  if(!PARTITE.length) return 0.6;
+  const pareggi = PARTITE.filter(p=>p.golA===p.golB).length;
+  const tasso = pareggi / PARTITE.length;
+  if(tasso <= 0) return 0.15;
+  if(tasso >= 0.95) return 8;
+  return 2*tasso/(1-tasso);
+}
+/* Probabilità di vittoria/pareggio/sconfitta tra due giocatori, basata SOLO
+   sul loro Elo attuale (si assume parità di stelle: non si può sapere in
+   anticipo quale squadra sceglieranno nella prossima partita). Modello di
+   Davidson (Bradley-Terry con pareggi), coerente con la formula Elo già
+   usata nel resto del sito (stessa base 10^(elo/X)). */
+function calcolaProbabilitaTestaATesta(idA, idB){
+  const gA = GIOCATORI[idA], gB = GIOCATORI[idB];
+  const eloA = gA.elo||CONFIG.eloIniziale, eloB = gB.elo||CONFIG.eloIniziale;
+  const x = CONFIG.x || 400;
+  const piA = Math.pow(10, eloA/x), piB = Math.pow(10, eloB/x);
+  const kappa = calcolaKappaPareggio();
+  const denom = piA + piB + kappa*Math.sqrt(piA*piB);
+  return {
+    pA: piA/denom,
+    pD: (kappa*Math.sqrt(piA*piB))/denom,
+    pB: piB/denom
+  };
+}
+window.mostraTestaATesta = function(idA, idB){
+  if(!idA || !idB || idA===idB){ mostraToast('Seleziona due giocatori diversi.'); return; }
+  const gA = GIOCATORI[idA], gB = GIOCATORI[idB];
+  if(!gA || !gB) return;
+  const scontri = PARTITE.filter(p=>(p.giocatoreA===idA&&p.giocatoreB===idB)||(p.giocatoreA===idB&&p.giocatoreB===idA))
+    .sort((a,b)=>b.timestamp-a.timestamp);
+  const ultimi5 = scontri.slice(0,5);
+  let vA=0, vB=0, pareggi=0;
+  scontri.forEach(p=>{
+    const golDiA = p.giocatoreA===idA ? p.golA : p.golB;
+    const golDiB = p.giocatoreA===idA ? p.golB : p.golA;
+    if(golDiA>golDiB) vA++; else if(golDiA<golDiB) vB++; else pareggi++;
+  });
+  const prob = calcolaProbabilitaTestaATesta(idA, idB);
+  const pct = n => Math.round(n*1000)/10;
+  const barraHtml = (label, valore, colore) => `
+    <div style="margin-top:6px;">
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;"><span>${label}</span><b>${pct(valore)}%</b></div>
+      <div style="background:#0b1019;border-radius:5px;height:9px;overflow:hidden;">
+        <div style="width:${pct(valore)}%;height:100%;background:${colore};"></div>
+      </div>
+    </div>`;
+  const listaScontriHtml = ultimi5.length ? ultimi5.map(p=>{
+    const nomeA = (GIOCATORI[p.giocatoreA]||{}).nome || '—';
+    const nomeB = (GIOCATORI[p.giocatoreB]||{}).nome || '—';
+    const data = new Date(p.timestamp).toLocaleDateString('it-IT');
+    return `<div class="partitaRiga" style="cursor:pointer;padding:8px 0;border-bottom:1px dashed var(--border);" onclick="mostraDettaglioPartita('${p.id}')">
+      <div class="cardScore">
+        <span><b>${nomeA}</b> <span class="matchScore">${p.golA} - ${p.golB}</span> <b>${nomeB}</b></span>
+        <span class="muted">${data}</span>
+      </div>
+    </div>`;
+  }).join('') : '<span class="muted">Nessuno scontro diretto registrato finora.</span>';
+  const html = `
+    <div class="cardScore">
+      <span><b>${gA.nome}</b></span>
+      <span class="muted">Elo ${Math.round(gA.elo||0)} vs ${Math.round(gB.elo||0)}</span>
+      <span><b>${gB.nome}</b></span>
+    </div>
+    <div class="muted" style="margin-top:8px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Probabilità prossima partita</div>
+    <div class="muted" style="font-size:10.5px;margin-top:2px;">Calcolata solo sull'Elo attuale, assumendo squadre di pari livello (le stelle si scelgono a partita e non si possono prevedere).</div>
+    ${barraHtml('Vittoria '+gA.nome, prob.pA, 'var(--verde)')}
+    ${barraHtml('Pareggio', prob.pD, 'var(--pareggio)')}
+    ${barraHtml('Vittoria '+gB.nome, prob.pB, 'var(--rosso)')}
+    <div class="muted" style="margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Scontri diretti (${scontri.length} totali)</div>
+    <div style="margin-top:4px;font-size:12.5px;"><b>${vA}</b> - <b>${pareggi}</b> - <b>${vB}</b> <span class="muted">(${gA.nome} vittorie - pareggi - ${gB.nome} vittorie)</span></div>
+    <div class="muted" style="margin-top:10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Ultimi 5 scontri</div>
+    <div style="margin-top:6px;">${listaScontriHtml}</div>
+  `;
+  apriModal('Testa a testa', html);
 }
 function aggiornaPagerPartite(pag, totale){
   document.getElementById('partitePagLabel').textContent = `Pag. ${pag}/${totale}`;
